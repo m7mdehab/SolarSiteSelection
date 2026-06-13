@@ -1,0 +1,64 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "osm3s": {
+    "timestamp_osm_base": "2024-01-15T10:00:00Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "way",
+      "id": 100030,
+      "nodes": [200030, 200031, 200032, 200033, 200030],
+      "tags": {
+        "landuse": "residential",
+        "name": "Test Residential Area"
+      }
+    },
+    {
+      "type": "node",
+      "id": 200030,
+      "lat": 31.1,
+      "lon": 27.1
+    },
+    {
+      "type": "node",
+      "id": 200031,
+      "lat": 31.12,
+      "lon": 27.1
+    },
+    {
+      "type": "node",
+      "id": 200032,
+      "lat": 31.12,
+      "lon": 27.12
+    },
+    {
+      "type": "node",
+      "id": 200033,
+      "lat": 31.1,
+      "lon": 27.12
+    },
+    {
+      "type": "node",
+      "id": 300010,
+      "lat": 31.3,
+      "lon": 27.7,
+      "tags": {
+        "place": "town",
+        "name": "Test Town",
+        "population": "5000"
+      }
+    },
+    {
+      "type": "node",
+      "id": 300011,
+      "lat": 31.4,
+      "lon": 27.8,
+      "tags": {
+        "place": "village",
+        "name": "Test Village"
+      }
+    }
+  ]
+}

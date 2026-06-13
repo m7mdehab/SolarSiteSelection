@@ -149,9 +149,16 @@ class DiskCache:
 
         if isinstance(value, xr.DataArray):
             data_path = self._data_stem(key).with_suffix(".nc")
-            value.to_netcdf(str(data_path))
+            # A DataArray carrying a `spatial_ref` coord (from rioxarray.write_crs)
+            # serialises that coord as a second NetCDF variable, which breaks
+            # `xr.open_dataarray` on reload. Persist the array's name so `_load`
+            # can select it back out of an open_dataset() and treat spatial_ref
+            # as a coordinate.
+            to_save = value if value.name is not None else value.rename("data")
+            to_save.to_netcdf(str(data_path))
             meta["dtype"] = "DataArray"
             meta["data_path"] = str(data_path)
+            meta["da_name"] = str(to_save.name)
         elif isinstance(value, gpd.GeoDataFrame):
             data_path = self._data_stem(key).with_suffix(".gpkg")
             value.to_file(str(data_path), driver="GPKG")
@@ -175,7 +182,15 @@ class DiskCache:
 
         dtype = str(meta.get("dtype", ""))
         if dtype == "DataArray":
-            da: xr.DataArray = xr.open_dataarray(str(data_path))
+            # Open as a Dataset with decode_coords="all" so a `spatial_ref`
+            # grid-mapping variable is restored as a coordinate (not a data var),
+            # then select the original array by its persisted name.
+            ds = xr.open_dataset(str(data_path), decode_coords="all")
+            da_name = meta.get("da_name")
+            if da_name is not None and da_name in ds.data_vars:
+                da = ds[str(da_name)]
+            else:
+                da = ds[next(iter(ds.data_vars))]
             # Load into memory so the file handle is released
             return da.load()
         elif dtype == "GeoDataFrame":

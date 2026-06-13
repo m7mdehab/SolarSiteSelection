@@ -1,0 +1,59 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "osm3s": {
+    "timestamp_osm_base": "2024-01-15T10:00:00Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "way",
+      "id": 100010,
+      "nodes": [200010, 200011, 200012],
+      "tags": {
+        "highway": "primary",
+        "name": "Alexandria Desert Road",
+        "ref": "1"
+      }
+    },
+    {
+      "type": "way",
+      "id": 100011,
+      "nodes": [200013, 200014],
+      "tags": {
+        "highway": "secondary",
+        "name": "Local Road"
+      }
+    },
+    {
+      "type": "node",
+      "id": 200010,
+      "lat": 31.05,
+      "lon": 27.1
+    },
+    {
+      "type": "node",
+      "id": 200011,
+      "lat": 31.1,
+      "lon": 27.3
+    },
+    {
+      "type": "node",
+      "id": 200012,
+      "lat": 31.15,
+      "lon": 27.5
+    },
+    {
+      "type": "node",
+      "id": 200013,
+      "lat": 31.2,
+      "lon": 27.2
+    },
+    {
+      "type": "node",
+      "id": 200014,
+      "lat": 31.25,
+      "lon": 27.4
+    }
+  ]
+}

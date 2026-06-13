@@ -1,0 +1,70 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API 0.7.62",
+  "osm3s": {
+    "timestamp_osm_base": "2024-01-15T10:00:00Z",
+    "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+  },
+  "elements": [
+    {
+      "type": "way",
+      "id": 100001,
+      "nodes": [200001, 200002, 200003],
+      "tags": {
+        "power": "line",
+        "voltage": "220000",
+        "cables": "3"
+      }
+    },
+    {
+      "type": "way",
+      "id": 100002,
+      "nodes": [200004, 200005],
+      "tags": {
+        "power": "line",
+        "voltage": "66000"
+      }
+    },
+    {
+      "type": "node",
+      "id": 200001,
+      "lat": 31.2,
+      "lon": 27.3
+    },
+    {
+      "type": "node",
+      "id": 200002,
+      "lat": 31.25,
+      "lon": 27.35
+    },
+    {
+      "type": "node",
+      "id": 200003,
+      "lat": 31.3,
+      "lon": 27.4
+    },
+    {
+      "type": "node",
+      "id": 200004,
+      "lat": 31.15,
+      "lon": 27.5
+    },
+    {
+      "type": "node",
+      "id": 200005,
+      "lat": 31.2,
+      "lon": 27.55
+    },
+    {
+      "type": "node",
+      "id": 300001,
+      "lat": 31.1,
+      "lon": 27.6,
+      "tags": {
+        "power": "substation",
+        "name": "Test Substation",
+        "substation": "transmission"
+      }
+    }
+  ]
+}

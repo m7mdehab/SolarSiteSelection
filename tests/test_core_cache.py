@@ -40,6 +40,32 @@ def _make_dataarray() -> xr.DataArray:
     return da
 
 
+def test_roundtrip_dataarray_with_crs(tmp_path: Path) -> None:
+    """A rioxarray-CRS-tagged DataArray must survive a cache round-trip.
+
+    Regression for the spatial_ref serialization bug: write_crs adds a
+    spatial_ref coord that NetCDF stores as a second variable, which broke the
+    old open_dataarray()-based reload. Every raster acquisition source hits this.
+    """
+    import rioxarray  # noqa: F401  # registers the .rio accessor
+
+    cache = DiskCache(tmp_path)
+    da = _make_dataarray().rio.write_crs(_UTM36N)
+    calls = {"n": 0}
+
+    def compute() -> xr.DataArray:
+        calls["n"] += 1
+        return da
+
+    first = cache.get_or_compute("ras", "h1", {"r": 100}, compute)
+    second = cache.get_or_compute("ras", "h1", {"r": 100}, compute)
+    assert calls["n"] == 1  # second call is a hit
+    np.testing.assert_array_equal(first.values, second.values)
+    assert second.rio.crs is not None
+    assert second.rio.crs.to_epsg() == 32636
+    assert second.name == "test_layer"
+
+
 def _make_geodataframe() -> gpd.GeoDataFrame:
     """Return a small deterministic GeoDataFrame."""
     polys = [box(0, 0, 1, 1), box(2, 0, 3, 1)]
