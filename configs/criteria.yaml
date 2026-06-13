@@ -1,0 +1,557 @@
+# =============================================================================
+# SolarSiteSelection — Criteria Registry
+# Reference methodology: Habib et al. 2020 (GIS-based MCDA for PV siting)
+# =============================================================================
+#
+# PROVENANCE LEGEND:
+#   PUBLIC (Habib 2020 abstract) — value confirmed in publicly-accessible text
+#     of Habib et al. 2020 or its abstract/publicly-visible supplementary info.
+#   literature-standard default   — value from mainstream PV-siting MCDA
+#     literature (Al Garni & Awasthi 2017; Sánchez-Lozano et al. 2013;
+#     NASA/ESRA PV siting guidelines); not specific to Habib 2020.
+#   PM plan decision              — explicitly set by the project's Master Agent
+#     plan; not derived from any paper.
+#
+# Within-group local weights are DEFAULT MCDA weights, refinable via the AHP
+# editor at runtime.  They are NOT published paper weights.
+#
+# The 5-class LSI scheme is PUBLIC (Habib 2020 abstract).
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Global group weights  [PM plan decision]
+# Economic 0.50 + Technical 0.25 + Environmental 0.25 = 1.00
+# ---------------------------------------------------------------------------
+groups:
+  economic:
+    name: Economic
+    weight: 0.50   # PM plan decision
+  technical:
+    name: Technical
+    weight: 0.25   # PM plan decision
+  environmental:
+    name: Environmental
+    weight: 0.25   # PM plan decision
+
+# ---------------------------------------------------------------------------
+# LSI classification scheme  [PUBLIC — Habib 2020 abstract]
+# ---------------------------------------------------------------------------
+lsi_classes:
+  - id: 5
+    label: most_suitable
+    description: Most suitable
+  - id: 4
+    label: highly_suitable
+    description: Highly suitable
+  - id: 3
+    label: moderately_suitable
+    description: Moderately suitable
+  - id: 2
+    label: marginally_suitable
+    description: Marginally suitable
+  - id: 1
+    label: least_suitable
+    description: Least suitable
+
+# ---------------------------------------------------------------------------
+# Sub-criteria
+#
+# MCDA group assignment reasoning (documented here per spec requirement):
+#
+# Economic group (0.50):
+#   - dist_ptl, dist_roads, dist_railway, dist_urban: proximity to
+#     infrastructure directly drives grid connection CAPEX, O&M access cost,
+#     and land acquisition cost — core economic drivers.
+#   - land_capability: high agricultural-value land incurs higher opportunity
+#     cost and regulatory hurdles; low-capability land is cheaper to acquire.
+#
+# Technical group (0.25):
+#   - solar_radiation: the fundamental energy input — GHI determines yield.
+#   - slope: affects panel alignment, earthwork cost, and drainage; > 15°
+#     makes construction impractical.
+#   - aspect: controls incident angle relative to the sun.
+#   - shadow: persistent shadowing reduces effective irradiance.
+#
+# Environmental group (0.25):
+#   - lulc: land-use determines ecological sensitivity and regulatory class.
+#   - temperature: panel efficiency decreases with cell temperature (PV coeff).
+#   - humidity: high humidity degrades modules, increases soiling losses.
+#   - wind_speed: moderate wind aids cooling; very high wind = structural risk.
+# ---------------------------------------------------------------------------
+
+criteria:
+
+  # =========================================================================
+  # ECONOMIC GROUP  (group weight = 0.50)
+  # Local weights within group must sum to 1.00.
+  # Assigned: 0.30 + 0.25 + 0.15 + 0.15 + 0.15 = 1.00
+  # =========================================================================
+
+  dist_ptl:
+    key: dist_ptl
+    name: Distance to Power Transmission Lines (PTL)
+    group: economic
+    kind: factor
+    local_weight: 0.30   # literature-standard default; highest economic weight
+                         # because grid connection cost dominates CAPEX
+    data_source: osm_power
+    unit: km
+    reclassification:
+      type: breakpoints
+      # Score 0..1 (1 = most suitable, 0 = least/excluded)
+      # Safety buffer: < 4.8 km is excluded/least-suitable  [PUBLIC — Habib 2020 abstract]
+      # Suitability decreases with distance beyond that (cost rises) [PUBLIC]
+      # > 50 km is unsuitable (prohibitive cost)  [PUBLIC — Habib 2020 abstract]
+      breakpoints:
+        - max: 4.8
+          score: 0.0    # hard exclusion zone — cells < 4.8 km from PTL
+          note: PUBLIC (Habib 2020 abstract) — safety/interference buffer
+        - max: 10.0
+          score: 1.0    # closest usable zone — lowest connection cost
+          note: literature-standard default
+        - max: 20.0
+          score: 0.75
+          note: literature-standard default
+        - max: 35.0
+          score: 0.50
+          note: literature-standard default
+        - max: 50.0
+          score: 0.25
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # > 50 km = unsuitable  [PUBLIC — Habib 2020 abstract]
+          note: PUBLIC (Habib 2020 abstract)
+
+  dist_roads:
+    key: dist_roads
+    name: Distance to Roads
+    group: economic
+    kind: factor
+    local_weight: 0.25   # literature-standard default
+    data_source: osm_roads
+    unit: km
+    reclassification:
+      type: breakpoints
+      # 150 m buffer = excluded (safety)  [PUBLIC — Habib 2020 abstract]
+      # > 50 km = restricted/unsuitable  [PUBLIC — Habib 2020 abstract]
+      breakpoints:
+        - max: 0.15      # 150 m  [PUBLIC — Habib 2020 abstract]
+          score: 0.0
+          note: PUBLIC (Habib 2020 abstract) — safety exclusion buffer
+        - max: 5.0
+          score: 1.0     # closest usable — lowest access/O&M cost
+          note: literature-standard default
+        - max: 15.0
+          score: 0.75
+          note: literature-standard default
+        - max: 30.0
+          score: 0.50
+          note: literature-standard default
+        - max: 50.0
+          score: 0.25
+          note: literature-standard default
+        - max: .inf
+          score: 0.0     # > 50 km unsuitable  [PUBLIC — Habib 2020 abstract]
+          note: PUBLIC (Habib 2020 abstract)
+
+  dist_railway:
+    key: dist_railway
+    name: Distance to Railway
+    group: economic
+    kind: factor
+    local_weight: 0.15   # literature-standard default; lower than roads
+    data_source: osm_railway
+    unit: km
+    reclassification:
+      type: breakpoints
+      # 150 m buffer = excluded (safety)  [PUBLIC — Habib 2020 abstract]
+      # > 50 km = restricted/unsuitable  [PUBLIC — Habib 2020 abstract]
+      breakpoints:
+        - max: 0.15      # 150 m  [PUBLIC — Habib 2020 abstract]
+          score: 0.0
+          note: PUBLIC (Habib 2020 abstract) — safety exclusion buffer
+        - max: 5.0
+          score: 1.0
+          note: literature-standard default
+        - max: 15.0
+          score: 0.75
+          note: literature-standard default
+        - max: 30.0
+          score: 0.50
+          note: literature-standard default
+        - max: 50.0
+          score: 0.25
+          note: literature-standard default
+        - max: .inf
+          score: 0.0     # > 50 km unsuitable  [PUBLIC — Habib 2020 abstract]
+          note: PUBLIC (Habib 2020 abstract)
+
+  dist_urban:
+    key: dist_urban
+    name: Distance to Urban Areas
+    group: economic
+    kind: factor
+    local_weight: 0.15   # literature-standard default
+    data_source: osm_urban
+    unit: km
+    reclassification:
+      type: breakpoints
+      # < 1.5 km = hard exclusion  [PUBLIC — Habib 2020 abstract]
+      # Moderate distance reduces land cost while retaining access
+      breakpoints:
+        - max: 1.5       # [PUBLIC — Habib 2020 abstract]
+          score: 0.0
+          note: PUBLIC (Habib 2020 abstract) — hard exclusion buffer
+        - max: 10.0
+          score: 1.0     # close to urban load centre — reduces transmission loss
+          note: literature-standard default
+        - max: 25.0
+          score: 0.75
+          note: literature-standard default
+        - max: 40.0
+          score: 0.50
+          note: literature-standard default
+        - max: .inf
+          score: 0.25    # very remote — still possible but costly
+          note: literature-standard default
+
+  land_capability:
+    key: land_capability
+    name: Land Capability Class
+    group: economic
+    kind: factor
+    local_weight: 0.15   # literature-standard default
+    data_source: land_capability
+    unit: class_index
+    reclassification:
+      type: class_scores
+      # USDA Land Capability Classes I–VIII  (literature-standard default)
+      # Classes VII–VIII (non-arable/barren) = most suitable for PV (lowest
+      # opportunity cost, fewest agricultural restrictions).
+      # Classes I–II (prime farmland) = least suitable.
+      class_scores:
+        "I":    0.0    # prime farmland — avoid  [literature-standard default]
+        "II":   0.1
+        "III":  0.25
+        "IV":   0.50
+        "V":    0.65
+        "VI":   0.80
+        "VII":  0.90
+        "VIII": 1.0   # wasteland/barren — best for PV  [literature-standard default]
+
+  # =========================================================================
+  # TECHNICAL GROUP  (group weight = 0.25)
+  # Local weights: 0.40 + 0.25 + 0.20 + 0.15 = 1.00
+  # =========================================================================
+
+  solar_radiation:
+    key: solar_radiation
+    name: Solar Radiation (GHI)
+    group: technical
+    kind: factor
+    local_weight: 0.40   # literature-standard default; GHI is primary yield driver
+    data_source: pvgis
+    unit: kWh/m2/day
+    reclassification:
+      type: breakpoints
+      # Study-area range 4.7–5.9 kWh/m²/day  [PUBLIC — Habib 2020 abstract]
+      # Higher GHI = more suitable; linear interpolation within range.
+      breakpoints:
+        - max: 3.5
+          score: 0.0    # very low — uneconomical  [literature-standard default]
+          note: literature-standard default
+        - max: 4.0
+          score: 0.1
+          note: literature-standard default
+        - max: 4.7
+          score: 0.25   # lower bound of study-area range  [PUBLIC]
+          note: PUBLIC (Habib 2020 abstract) — study-area lower bound
+        - max: 5.0
+          score: 0.50
+          note: literature-standard default (within PUBLIC study-area range)
+        - max: 5.4
+          score: 0.75
+          note: literature-standard default (within PUBLIC study-area range)
+        - max: 5.9
+          score: 1.0    # upper bound of study-area range  [PUBLIC]
+          note: PUBLIC (Habib 2020 abstract) — study-area upper bound
+        - max: .inf
+          score: 1.0    # above 5.9 — still excellent
+          note: literature-standard default
+
+  slope:
+    key: slope
+    name: Slope
+    group: technical
+    kind: factor
+    local_weight: 0.25   # literature-standard default
+    data_source: terrain
+    unit: degrees
+    reclassification:
+      type: breakpoints
+      # < 5° = most suitable  [PUBLIC — Habib 2020 abstract]
+      # > 15° = unsuitable (construction impractical)
+      # [<5° optimal is PUBLIC; finer bands are literature-standard]
+      breakpoints:
+        - max: 5.0
+          score: 1.0    # [PUBLIC — Habib 2020 abstract] — most suitable
+          note: PUBLIC (Habib 2020 abstract)
+        - max: 10.0
+          score: 0.75   # [literature-standard default]
+          note: literature-standard default
+        - max: 15.0
+          score: 0.40   # [literature-standard default]
+          note: literature-standard default
+        - max: 20.0
+          score: 0.10   # [literature-standard default]
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # > 20° — unsuitable  [literature-standard default]
+          note: literature-standard default
+
+  aspect:
+    key: aspect
+    name: Aspect (Slope Orientation)
+    group: technical
+    kind: factor
+    local_weight: 0.20   # literature-standard default
+    data_source: terrain
+    unit: compass_class
+    reclassification:
+      type: class_scores
+      # Northern Hemisphere: south-facing = optimal  [literature-standard default]
+      # 8-way compass classes + flat.
+      class_scores:
+        flat:       1.0   # flat land equally good as south  [literature-standard default]
+        south:      1.0   # maximum annual insolation
+        southwest:  0.80
+        southeast:  0.80
+        west:       0.60
+        east:       0.60
+        northwest:  0.30
+        northeast:  0.30
+        north:      0.0   # least suitable in Northern Hemisphere
+      note: literature-standard default
+
+  shadow:
+    key: shadow
+    name: Shadow / Shading Frequency
+    group: technical
+    kind: factor
+    local_weight: 0.15   # literature-standard default
+    data_source: terrain
+    unit: fraction_shadowed_hours
+    reclassification:
+      type: breakpoints
+      # Fraction of daylight hours with shadowing (0–1)  [literature-standard default]
+      # Lower = more suitable (less shading)
+      breakpoints:
+        - max: 0.05
+          score: 1.0    # negligible shadow  [literature-standard default]
+          note: literature-standard default
+        - max: 0.10
+          score: 0.80
+          note: literature-standard default
+        - max: 0.20
+          score: 0.50
+          note: literature-standard default
+        - max: 0.35
+          score: 0.25
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # heavily shadowed
+          note: literature-standard default
+
+  # =========================================================================
+  # ENVIRONMENTAL GROUP  (group weight = 0.25)
+  # Local weights: 0.40 + 0.20 + 0.20 + 0.20 = 1.00
+  # =========================================================================
+
+  lulc:
+    key: lulc
+    name: Land Use / Land Cover (LULC)
+    group: environmental
+    kind: factor         # graded factor; specific LULC classes become hard
+                         # exclusions via the hard_exclusions overlay
+    local_weight: 0.40   # literature-standard default
+    data_source: worldcover
+    unit: esa_worldcover_class
+    reclassification:
+      type: class_scores
+      # ESA WorldCover v2 classes  [literature-standard default]
+      # Barren/sparse = most suitable; water/built-up = hard exclusion
+      class_scores:
+        "10":  0.0    # Tree cover — avoid (ecological)
+        "20":  0.0    # Shrubland — low suitability
+        "30":  0.40   # Grassland
+        "40":  0.0    # Cropland — avoid (food security)
+        "50":  0.0    # Built-up — HARD EXCLUSION (handled separately)
+        "60":  1.0    # Bare/sparse vegetation — most suitable
+        "70":  0.0    # Snow and ice — unsuitable
+        "80":  0.0    # Permanent water bodies — HARD EXCLUSION
+        "90":  0.0    # Herbaceous wetland — unsuitable
+        "95":  0.0    # Mangroves — unsuitable
+        "100": 0.70   # Moss and lichen (sparse) — suitable
+      hard_exclusion_classes: ["50", "80"]   # built-up & water = always excluded
+      note: literature-standard default; class codes from ESA WorldCover v2
+
+  temperature:
+    key: temperature
+    name: Mean Annual Temperature
+    group: environmental
+    kind: factor
+    local_weight: 0.20   # literature-standard default
+    data_source: openmeteo
+    unit: celsius
+    reclassification:
+      type: breakpoints
+      # PV panel efficiency falls ~0.4–0.5%/°C above 25°C  [literature-standard default]
+      # Lower ambient temperature = better cell efficiency
+      breakpoints:
+        - max: 15.0
+          score: 1.0    # cool climate — best for PV efficiency
+          note: literature-standard default
+        - max: 20.0
+          score: 0.85
+          note: literature-standard default
+        - max: 25.0
+          score: 0.70
+          note: literature-standard default
+        - max: 30.0
+          score: 0.50
+          note: literature-standard default
+        - max: 35.0
+          score: 0.30
+          note: literature-standard default
+        - max: 40.0
+          score: 0.15
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # > 40°C — significant efficiency degradation
+          note: literature-standard default
+
+  humidity:
+    key: humidity
+    name: Mean Annual Relative Humidity
+    group: environmental
+    kind: factor
+    local_weight: 0.20   # literature-standard default
+    data_source: openmeteo
+    unit: percent
+    reclassification:
+      type: breakpoints
+      # Lower humidity = less soiling, less module degradation  [literature-standard default]
+      breakpoints:
+        - max: 20.0
+          score: 1.0    # very dry — ideal  [literature-standard default]
+          note: literature-standard default
+        - max: 35.0
+          score: 0.85
+          note: literature-standard default
+        - max: 50.0
+          score: 0.65
+          note: literature-standard default
+        - max: 65.0
+          score: 0.40
+          note: literature-standard default
+        - max: 80.0
+          score: 0.20
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # > 80% — high degradation risk
+          note: literature-standard default
+
+  wind_speed:
+    key: wind_speed
+    name: Mean Annual Wind Speed
+    group: environmental
+    kind: factor
+    local_weight: 0.20   # literature-standard default
+    data_source: openmeteo
+    unit: m/s
+    reclassification:
+      type: breakpoints
+      # Moderate wind aids passive cooling; very high = structural risk
+      # [literature-standard default]
+      breakpoints:
+        - max: 2.0
+          score: 0.60   # very calm — minimal cooling effect
+          note: literature-standard default
+        - max: 4.0
+          score: 1.0    # moderate — good cooling, low structural risk
+          note: literature-standard default
+        - max: 6.0
+          score: 0.80
+          note: literature-standard default
+        - max: 8.0
+          score: 0.50
+          note: literature-standard default
+        - max: 10.0
+          score: 0.25   # high — structural reinforcement required
+          note: literature-standard default
+        - max: .inf
+          score: 0.0    # > 10 m/s — extreme structural risk
+          note: literature-standard default
+
+# ---------------------------------------------------------------------------
+# Hard-exclusion constraints (binary masks — applied BEFORE scoring)
+# These cells receive score = 0 regardless of any weighted overlay.
+# [mix of PUBLIC from Habib 2020 abstract and literature-standard defaults]
+# ---------------------------------------------------------------------------
+hard_exclusions:
+  - key: excl_wdpa
+    name: WDPA Protected Areas
+    kind: hard_exclusion
+    data_source: wdpa
+    exclude_when: "intersects protected area polygon"
+    note: literature-standard default — legally protected land
+
+  - key: excl_water
+    name: Permanent Water Bodies
+    kind: hard_exclusion
+    data_source: worldcover
+    exclude_when: "lulc_class == '80'"
+    note: literature-standard default
+
+  - key: excl_urban_core
+    name: Urban / Built-up Core
+    kind: hard_exclusion
+    data_source: worldcover
+    exclude_when: "lulc_class == '50'"
+    note: literature-standard default
+
+  - key: excl_urban_buffer
+    name: Urban Areas < 1.5 km Buffer
+    kind: hard_exclusion
+    data_source: osm_urban
+    exclude_when: "dist_urban_km < 1.5"
+    note: PUBLIC (Habib 2020 abstract)
+
+  - key: excl_slope
+    name: Steep Slopes > 20°
+    kind: hard_exclusion
+    data_source: terrain
+    exclude_when: "slope_deg > 20"
+    note: literature-standard default (Habib 2020 uses >15° as unsuitable;
+          20° is the absolute construction limit used here)
+
+  - key: excl_road_buffer
+    name: Road Safety Buffer (< 150 m)
+    kind: hard_exclusion
+    data_source: osm_roads
+    exclude_when: "dist_roads_km < 0.15"
+    note: PUBLIC (Habib 2020 abstract)
+
+  - key: excl_railway_buffer
+    name: Railway Safety Buffer (< 150 m)
+    kind: hard_exclusion
+    data_source: osm_railway
+    exclude_when: "dist_railway_km < 0.15"
+    note: PUBLIC (Habib 2020 abstract)
+
+  - key: excl_ptl_buffer
+    name: PTL Safety Buffer (< 4.8 km)
+    kind: hard_exclusion
+    data_source: osm_power
+    exclude_when: "dist_ptl_km < 4.8"
+    note: PUBLIC (Habib 2020 abstract)
