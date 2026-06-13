@@ -1,0 +1,19 @@
+{
+  "type": "Feature",
+  "properties": {
+    "name": "NW Coast Egypt — Marsa Matruh demo AOI",
+    "note": "Coastal strip in Matrouh Governorate; the Habib et al. 2020 reference study area. Kept under the 10,000 km^2 AOI limit."
+  },
+  "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [27.0, 31.0],
+        [28.0, 31.0],
+        [28.0, 31.5],
+        [27.0, 31.5],
+        [27.0, 31.0]
+      ]
+    ]
+  }
+}

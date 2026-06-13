@@ -56,6 +56,46 @@ class GridSpec:
         if self.resolution_m <= 0:
             raise ValueError(f"resolution_m must be positive, got {self.resolution_m}")
 
+    @classmethod
+    def from_aoi(cls, aoi: Any, resolution_m: int = DEFAULT_RESOLUTION_M) -> GridSpec:
+        """Build a grid covering an AOI, in the AOI's working (UTM) CRS.
+
+        The AOI geometry (WGS-84) is reprojected to the UTM zone of its centroid;
+        the projected bounds are expanded outward to whole ``resolution_m`` cells
+        so the grid fully contains the AOI. Every raster source aligns to this
+        grid, guaranteeing layers stack cell-for-cell.
+
+        Args:
+            aoi: A ``solarsite.core.AOI`` (has ``.geometry`` in WGS-84).
+            resolution_m: Cell size in metres.
+
+        Returns:
+            A GridSpec in the working CRS.
+        """
+        # Imported here to avoid a module-level import cycle (crs imports nothing heavy).
+        from pyproj import Transformer
+        from shapely.ops import transform as shapely_transform
+
+        from .crs import working_crs_for
+
+        crs = working_crs_for(aoi.geometry)
+        transformer = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+        projected = shapely_transform(transformer.transform, aoi.geometry)
+        minx, miny, maxx, maxy = projected.bounds
+        # Snap outward to whole cells.
+        minx = np.floor(minx / resolution_m) * resolution_m
+        miny = np.floor(miny / resolution_m) * resolution_m
+        maxx = np.ceil(maxx / resolution_m) * resolution_m
+        maxy = np.ceil(maxy / resolution_m) * resolution_m
+        return cls(
+            minx=float(minx),
+            miny=float(miny),
+            maxx=float(maxx),
+            maxy=float(maxy),
+            resolution_m=resolution_m,
+            crs=crs,
+        )
+
     @property
     def width(self) -> int:
         """Number of columns."""
