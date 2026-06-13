@@ -1,0 +1,99 @@
+.ahp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ahp-cr-gauge {
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ahp-cr-ok {
+  background: #F0FDF4;
+  color: var(--color-success);
+  border: 1px solid #BBF7D0;
+}
+
+.ahp-cr-bad {
+  background: #FEF2F2;
+  color: var(--color-danger);
+  border: 1px solid #FECACA;
+}
+
+.ahp-matrix-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.ahp-matrix {
+  border-collapse: collapse;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ahp-matrix th,
+.ahp-matrix td {
+  padding: 3px 5px;
+  border: 1px solid var(--color-border);
+  text-align: center;
+  vertical-align: middle;
+}
+
+.ahp-matrix th {
+  background: #F8FAFC;
+  font-weight: 600;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ahp-row-label {
+  background: #F8FAFC;
+  font-weight: 600;
+  text-align: right;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ahp-cell-diag {
+  background: #F1F5F9;
+  color: var(--color-text-muted);
+}
+
+.ahp-cell-lower {
+  background: #F8FAFC;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.ahp-cell-upper select {
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 1px 2px;
+  font-size: 11px;
+  background: var(--color-surface);
+}
+
+.ahp-cell-inconsistent {
+  background: #FEF9C3 !important;
+  border-color: #F59E0B !important;
+}
+
+.ahp-weights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.ahp-weight-chip {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: #1D4ED8;
+  padding: 2px 7px;
+  border-radius: 10px;
+}

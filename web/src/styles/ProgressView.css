@@ -1,0 +1,99 @@
+.progress-view {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.progress-overall {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-status-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.progress-status-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.progress-status-queued { background: #F1F5F9; color: var(--color-text-muted); }
+.progress-status-acquiring { background: #FFF7ED; color: #C2410C; }
+.progress-status-analyzing { background: #EFF6FF; color: #1D4ED8; }
+.progress-status-done { background: #F0FDF4; color: var(--color-success); }
+.progress-status-error { background: #FEF2F2; color: var(--color-danger); }
+
+.progress-error {
+  color: var(--color-danger);
+  font-size: 12px;
+  padding: 4px 8px;
+  background: #FEF2F2;
+  border-radius: 4px;
+  width: 100%;
+}
+
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
+
+.progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.stage-icon {
+  font-size: 11px;
+  font-weight: 700;
+  width: 16px;
+  text-align: center;
+}
+
+.stage-icon-pending { color: var(--color-text-muted); }
+.stage-icon-running { color: var(--color-warning); }
+.stage-icon-done { color: var(--color-success); }
+.stage-icon-failed { color: var(--color-danger); }
+
+.progress-stage-source {
+  flex: 1;
+  color: var(--color-text);
+}
+
+.progress-stage-error {
+  font-size: 11px;
+  color: var(--color-danger);
+}
+
+.progress-done-msg {
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  color: #166534;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.progress-skipped {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}

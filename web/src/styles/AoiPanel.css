@@ -1,0 +1,70 @@
+.aoi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aoi-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.aoi-preset-select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.aoi-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.aoi-btn {
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.aoi-btn:hover {
+  border-color: var(--color-accent);
+  background: #F0F9FF;
+}
+
+.aoi-btn-active {
+  border-color: var(--color-accent);
+  background: #E0F2FE;
+  color: var(--color-accent-dark);
+}
+
+.aoi-area-feedback {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 5px;
+}
+
+.aoi-area-ok {
+  background: #F0FDF4;
+  color: var(--color-success);
+  border: 1px solid #BBF7D0;
+}
+
+.aoi-area-warning {
+  background: #FFF7ED;
+  color: #C2410C;
+  border: 1px solid #FED7AA;
+}

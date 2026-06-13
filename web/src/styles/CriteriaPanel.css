@@ -1,0 +1,143 @@
+.criteria-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.criteria-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.criteria-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+}
+
+.criteria-expert-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.criteria-loading {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.criteria-group {
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.criteria-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #F8FAFC;
+  border: none;
+  text-align: left;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.criteria-group-header:hover {
+  background: #F1F5F9;
+}
+
+.criteria-group-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.criteria-group-weight {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  background: #E2E8F0;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.criteria-group-chevron {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.criteria-group-body {
+  border-top: 1px solid var(--color-border);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.criteria-item {
+  padding: 8px;
+  border: 1px solid #F1F5F9;
+  border-radius: 5px;
+  background: var(--color-surface);
+}
+
+.criteria-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.criteria-item-meta {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.criteria-item-source {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: #F1F5F9;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.criteria-item-unit {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  background: #F1F5F9;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.criteria-item-weight {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.criteria-item-weight input[type="range"] {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.criteria-ahp-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.criteria-ahp-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 8px;
+}
