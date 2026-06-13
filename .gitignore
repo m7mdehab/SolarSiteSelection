@@ -1,0 +1,33 @@
+# --- project-local, never committed ---
+_pm/
+data/
+.env
+
+# --- python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+dist/
+build/
+
+# --- node / frontend ---
+node_modules/
+web/dist/
+web/.vite/
+
+# --- editors / OS ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# --- test artifacts ---
+playwright-report/
+test-results/
