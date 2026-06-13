@@ -1,0 +1,6 @@
+class_id,label,pct_of_valid_area,area_km2
+5,Most suitable,34.22,1807.01
+4,Highly suitable,55.26,2918.05
+3,Moderately suitable,10.21,539.15
+2,Marginally suitable,0.02,1.06
+1,Least suitable,0.29,15.31
