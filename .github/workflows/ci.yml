@@ -13,6 +13,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.11"
+      - name: Install WeasyPrint system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev libcairo2
       - name: Sync dependencies
         run: uv sync --locked
       - name: Lint

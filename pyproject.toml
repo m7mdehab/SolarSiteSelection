@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "matplotlib>=3.8",
     "pillow>=10.0",
+    "weasyprint>=60.0",
 ]
 
 [dependency-groups]
