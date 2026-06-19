@@ -106,6 +106,11 @@ class JobState(BaseModel):
     # --- result summary (populated once status=done) --------------------------
     n_sites: int | None = None
     skipped_sources: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(
+        default_factory=list,
+        description="Human-readable caveats about this run (e.g. an exclusion layer that "
+        "could not be applied), surfaced in the UI so correctness gaps are never silent.",
+    )
 
 
 # ---------------------------------------------------------------------------

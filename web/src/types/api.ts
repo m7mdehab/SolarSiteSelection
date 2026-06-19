@@ -80,6 +80,7 @@ export interface JobResponse {
   error?: string;
   n_sites?: number;
   skipped_sources?: string[];
+  notes?: string[];
 }
 
 export interface LayerBounds {

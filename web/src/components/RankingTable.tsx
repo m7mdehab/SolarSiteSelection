@@ -1,5 +1,6 @@
 import { useAppContext } from '../context/AppContext';
 import type { SiteFeature } from '../types/api';
+import { fmt } from '../util/format';
 import '../styles/RankingTable.css';
 
 export function RankingTable() {
@@ -41,11 +42,11 @@ export function RankingTable() {
                 data-testid={`site-row-${p.rank}`}
               >
                 <td>{p.rank}</td>
-                <td>{p.area_km2.toFixed(2)}</td>
-                <td>{p.mean_lsi.toFixed(3)}</td>
-                <td data-testid={`site-yield-${p.rank}`}>{p.kwh_per_kwp_yr.toFixed(0)}</td>
-                <td>{p.gwh_per_yr.toFixed(2)}</td>
-                <td>{p.lcoe.toFixed(4)}</td>
+                <td>{fmt(p.area_km2, 2)}</td>
+                <td>{fmt(p.mean_lsi, 3)}</td>
+                <td data-testid={`site-yield-${p.rank}`}>{fmt(p.kwh_per_kwp_yr, 0)}</td>
+                <td>{fmt(p.gwh_per_yr, 2)}</td>
+                <td>{fmt(p.lcoe, 4)}</td>
               </tr>
             );
           })}

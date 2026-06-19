@@ -218,6 +218,13 @@ export function App() {
           <aside className="app-right-panel">
             <div className="app-right-scroll">
               {state.job && <ProgressView job={state.job} />}
+              {state.job?.status === 'done' && (state.job.notes?.length ?? 0) > 0 && (
+                <div className="job-notes" data-testid="job-notes" role="note">
+                  {state.job.notes!.map((n, i) => (
+                    <div key={i} className="job-note">⚠ {n}</div>
+                  ))}
+                </div>
+              )}
               {state.selectedSite && (
                 <SitePopup
                   props={state.selectedSite.properties}

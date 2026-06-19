@@ -340,3 +340,36 @@ def site_energy(
         lcoe_usd_per_mwh=lcoe_usd_per_mwh,
         assumptions=assumptions,
     )
+
+
+def site_energy_from_ghi(
+    ghi_annual_kwh_per_m2: float,
+    area_km2: float,
+    assumptions: EnergyAssumptions | None = None,
+    performance_ratio: float = 0.75,
+) -> EnergyResult:
+    """Offline energy estimate from annual GHI — no pvlib/TMY/network.
+
+    Approximates specific yield as ``GHI_annual * performance_ratio`` (PR ≈ 0.75
+    for utility-scale fixed-tilt PV). Used by the interactive analysis pipeline so
+    every candidate site always carries energy/LCOE fields, computed from the
+    already-cached annual-GHI raster (the offline preset runs with zero network).
+    The pvlib ModelChain path (:func:`site_energy`) remains the validation-grade
+    estimate (within ~2.6% of PVGIS PVcalc); this GHI*PR form trades a few percent
+    of accuracy for offline determinism. Reuses the same economics
+    (:class:`EnergyAssumptions`) and LCOE/CRF formula as ``site_energy``.
+    """
+    a = assumptions or EnergyAssumptions()
+    sy = max(0.0, float(ghi_annual_kwh_per_m2) * performance_ratio)  # kWh/kWp/yr
+    capacity_mwp = area_km2 * a.packing_density_mwp_per_km2
+    annual_gwh = sy * capacity_mwp / 1000.0
+    r, n = a.discount_rate, a.lifetime_yr
+    crf = r * (1.0 + r) ** n / ((1.0 + r) ** n - 1.0)
+    lcoe_usd_per_kwh = (a.capex_per_kwp * crf + a.opex_per_kwp_yr) / sy if sy > 0 else float("nan")
+    return EnergyResult(
+        specific_yield_kwh_kwp_yr=sy,
+        capacity_mwp=capacity_mwp,
+        annual_gwh=annual_gwh,
+        lcoe_usd_per_mwh=lcoe_usd_per_kwh * 1000.0,
+        assumptions=a,
+    )

@@ -79,6 +79,7 @@ from solarsite.analysis import (
     extract_sites,
     load_registry,
     reclassify_layer,
+    site_energy_from_ghi,
     weighted_overlay,
 )
 from solarsite.api.schemas import (
@@ -195,6 +196,7 @@ class _JobRecord:
         self.error: str | None = None
         self.n_sites: int | None = None
         self.skipped_sources: list[str] = []
+        self.notes: list[str] = []
         self.analysis_status: StageStatus = StageStatus.pending
         self.analysis_error: str | None = None
 
@@ -214,6 +216,7 @@ class _JobRecord:
             error=self.error,
             n_sites=self.n_sites,
             skipped_sources=list(self.skipped_sources),
+            notes=list(self.notes),
         )
 
 
@@ -241,6 +244,18 @@ async def _run_pipeline(
             record.acquire_stages,
         )
         record.skipped_sources = skipped
+        # Honesty: the WDPA protected-area dataset is licence-restricted (manual
+        # download) and is NOT redistributed in the deployed image. When it is
+        # absent, protected-area exclusions are not applied — say so explicitly
+        # rather than skipping silently.
+        from solarsite.acquire.landcover import _DEFAULT_WDPA_PATH
+
+        if not _DEFAULT_WDPA_PATH.exists():
+            record.notes.append(
+                "Protected-area (WDPA) exclusions were NOT applied: the WDPA dataset is "
+                "licence-restricted and not bundled with the deployment. WorldCover-based "
+                "exclusions (water, built-up) still apply."
+            )
     except Exception as exc:
         record.status = JobStatus.error
         record.error = f"Acquisition failed: {exc}"
@@ -413,53 +428,96 @@ def _criterion_key_to_layer_name(key: str) -> str:
     return mapping.get(key, key)
 
 
+def _site_ghi(layers: dict[str, xr.DataArray], cx: float, cy: float) -> float:
+    """Annual GHI (kWh/m²/yr) at a site centroid (working-CRS x/y), with fallbacks."""
+    ghi = layers.get("ghi_annual")
+    if ghi is None:
+        return 2000.0  # conservative default so energy fields are never undefined
+    try:
+        val = float(ghi.sel(x=cx, y=cy, method="nearest").item())
+        if not np.isfinite(val):
+            raise ValueError
+        return val
+    except Exception:
+        mean = float(np.nanmean(ghi.values))
+        return mean if np.isfinite(mean) else 2000.0
+
+
 def _enrich_sites(
     sites: gpd.GeoDataFrame,
     aoi: AOI,
     layers: dict[str, xr.DataArray],
 ) -> gpd.GeoDataFrame:
-    """Ensure required columns exist; compute energy for top site if TMY available.
+    """Add per-site energy/economics so every site always carries the fields the
+    UI renders (``kwh_per_kwp_yr``, ``gwh_per_yr``, ``lcoe``, ``capacity_mwp``).
 
-    ``aoi`` and ``layers`` are reserved for future energy enrichment (P2.4).
+    Uses the offline GHI-based estimate (:func:`site_energy_from_ghi`) sampled from
+    the cached annual-GHI raster — no network, so the offline preset still works.
+    The fields are ALWAYS populated (numbers), so the frontend never sees an
+    undefined value (the regression that white-screened the app).
     """
-    _ = aoi  # reserved for future energy enrichment
-    _ = layers  # reserved for future energy enrichment
-    return sites
+    _ = aoi
+    if len(sites) == 0:
+        return sites
+
+    def _rf(row: Any, key: str) -> float:
+        v = row.get(key)
+        try:
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    out = sites.copy()
+    sy_list, gwh_list, lcoe_list, cap_list = [], [], [], []
+    for _, row in out.iterrows():
+        ghi = _site_ghi(layers, _rf(row, "centroid_x"), _rf(row, "centroid_y"))
+        e = site_energy_from_ghi(ghi, _rf(row, "area_km2"))
+        sy_list.append(round(e.specific_yield_kwh_kwp_yr, 1))
+        gwh_list.append(round(e.annual_gwh, 3))
+        lcoe_list.append(round(e.lcoe_usd_per_mwh / 1000.0, 5))  # USD/kWh for the UI
+        cap_list.append(round(e.capacity_mwp, 2))
+    out["kwh_per_kwp_yr"] = sy_list
+    out["gwh_per_yr"] = gwh_list
+    out["lcoe"] = lcoe_list
+    out["capacity_mwp"] = cap_list
+    return out
 
 
 def _save_layer(job_dir: Path, name: str, da: xr.DataArray) -> None:
-    """Persist a DataArray to NetCDF in the job directory.
+    """Persist a DataArray to NetCDF (numeric-only — scipy-backend safe).
 
-    Drops rioxarray-added coordinates (spatial_ref) that have string dtype and
-    cause netCDF4 encoding errors, while preserving x/y coords and the CRS
-    string in attrs so _save_bounds can reconstruct the WGS-84 extent.
+    xarray falls back to the **scipy** netcdf backend when netCDF4/h5netcdf are
+    absent, and scipy cannot serialise unicode string attributes — a WKT ``crs``
+    string (and the ``crs_wkt`` attr on the rioxarray ``spatial_ref`` coord)
+    raised ``KeyError: ('U', 60)`` and silently dropped the LSI layer. We drop
+    the ``spatial_ref`` grid-mapping coord and every non-numeric attribute, and
+    record the CRS as an EPSG integer so a consumer can reconstruct it. The
+    WGS-84 extent is written separately by ``_save_bounds`` (from the live CRS).
     """
     try:
         out = job_dir / f"{name}.nc"
+        crs_epsg: int | None = None
+        try:
+            crs_epsg = da.rio.crs.to_epsg() if da.rio.crs is not None else None
+        except Exception:
+            crs_epsg = None
+
         da_save = da.copy()
-
-        # Save CRS info into attrs before stripping spatial_ref
-        crs_str: str | None = None
-        if da_save.rio.crs is not None:
-            crs_str = da_save.rio.crs.to_string()
-        elif "crs" in da_save.attrs:
-            crs_str = str(da_save.attrs["crs"])
-
-        # Drop rioxarray-added string coords that break netCDF encoding
-        coords_to_drop = [
-            c for c in da_save.coords if da_save.coords[c].dtype.kind in ("U", "S", "O")
+        # Drop the rioxarray grid-mapping coord (int64, but carries a crs_wkt
+        # STRING attr) and any non-numeric coords.
+        drop = [
+            c
+            for c in da_save.coords
+            if c == "spatial_ref" or da_save.coords[c].dtype.kind in ("U", "S", "O")
         ]
-        if coords_to_drop:
-            da_save = da_save.drop_vars(coords_to_drop)
+        if drop:
+            da_save = da_save.drop_vars(drop)
 
-        # Keep only serialisable attrs
-        da_save.attrs = {
-            k: v
-            for k, v in da_save.attrs.items()
-            if isinstance(v, (str, int, float)) or (isinstance(v, list) and len(v) < 100)
-        }
-        if crs_str:
-            da_save.attrs["crs"] = crs_str
+        # Numeric-only attrs (scipy cannot write str/list/object attrs).
+        da_save.attrs = {k: v for k, v in da_save.attrs.items() if isinstance(v, (int, float))}
+        if crs_epsg is not None:
+            da_save.attrs["crs_epsg"] = int(crs_epsg)
+        da_save.name = name
 
         da_save.to_netcdf(out)
     except Exception as exc:

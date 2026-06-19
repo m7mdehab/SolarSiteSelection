@@ -17,6 +17,18 @@ so it works without any third-party API calls.
 
 _Screenshots from the [live Space](https://huggingface.co/spaces/M7mdehab/solar-site-selection); click through to run the full draw → analyze → ranked-sites → PDF flow._
 
+### Coverage & regions
+
+- The **two dropdown presets are Egypt AOIs** whose input data is pre-cached, so they run instantly and
+  fully offline.
+- **Any area, anywhere, can be drawn or uploaded.** All acquisition sources (PVGIS, Copernicus GLO-30,
+  OSM/Overpass, ESA WorldCover, Open-Meteo) are global, so a non-preset AOI runs via **live acquisition** —
+  it is slower (seconds to a few minutes, depending on size and API load) but works worldwide.
+- **Protected-area (WDPA) exclusions are Egypt-only.** The WDPA dataset is licence-restricted (manual
+  download) and is not bundled with the deployment, so protected-area exclusions are applied only where the
+  WDPA file is present. When they are not applied, the results panel says so explicitly (no silent skip);
+  WorldCover-based exclusions (water, built-up) still apply everywhere.
+
 ---
 
 ## What it does

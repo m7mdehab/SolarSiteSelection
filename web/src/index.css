@@ -41,3 +41,37 @@ a {
   color: var(--color-accent);
   text-decoration: none;
 }
+
+/* Error boundary fallback — keeps the app visible instead of a white screen. */
+.error-boundary {
+  margin: 1rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e0b4b4;
+  border-radius: 6px;
+  background: #fff6f6;
+  color: #7a2e2e;
+  font-size: 0.9rem;
+}
+.error-boundary-detail {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  opacity: 0.8;
+  word-break: break-word;
+}
+.error-boundary button {
+  margin-top: 0.5rem;
+}
+
+/* Run caveats (e.g. an exclusion layer that could not be applied). */
+.job-notes {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #d9a441;
+  background: #fff8ec;
+  border-radius: 4px;
+}
+.job-note {
+  font-size: 0.82rem;
+  color: #6b4e16;
+  line-height: 1.4;
+}

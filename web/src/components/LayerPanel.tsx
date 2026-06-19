@@ -53,7 +53,7 @@ export function LayerPanel({ lsiClassesFromApi }: LayerPanelProps) {
       ))}
 
       {state.availableLayers.includes('lsi') && (
-        <div className="lsi-legend">
+        <div className="lsi-legend" data-testid="lsi-legend">
           <div className="lsi-legend-title">LSI Classes</div>
           {lsiClasses.map((cls) => (
             <div key={cls.id} className="lsi-legend-item">

@@ -7,7 +7,13 @@ from solarsite.analysis.ahp import (
     ahp_weights,
     ahp_weights_strict,
 )
-from solarsite.analysis.energy import EnergyAssumptions, EnergyResult, site_energy, specific_yield
+from solarsite.analysis.energy import (
+    EnergyAssumptions,
+    EnergyResult,
+    site_energy,
+    site_energy_from_ghi,
+    specific_yield,
+)
 from solarsite.analysis.overlay import (
     apply_exclusions,
     build_exclusion_mask,
@@ -35,6 +41,7 @@ __all__ = [
     "load_registry",
     "reclassify_layer",
     "site_energy",
+    "site_energy_from_ghi",
     "specific_yield",
     "weighted_overlay",
 ]
