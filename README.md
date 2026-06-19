@@ -11,8 +11,11 @@
 preset Northwest-Coast-of-Egypt AOI runs end-to-end from a baked offline cache,
 so it works without any third-party API calls.
 
-<!-- demo GIF is added once a recording of the hosted instance is captured -->
-![demo](docs/assets/demo.gif)
+| Draw or pick an area | Select a preset AOI and weighted criteria |
+|---|---|
+| ![app overview](docs/assets/demo-1-landing.png) | ![AOI + criteria](docs/assets/demo-2-aoi-criteria.png) |
+
+_Screenshots from the [live Space](https://huggingface.co/spaces/M7mdehab/solar-site-selection); click through to run the full draw → analyze → ranked-sites → PDF flow._
 
 ---
 
