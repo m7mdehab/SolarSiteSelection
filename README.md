@@ -3,10 +3,15 @@
 [![CI](https://github.com/m7mdehab/SolarSiteSelection/actions/workflows/ci.yml/badge.svg)](https://github.com/m7mdehab/SolarSiteSelection/actions/workflows/ci.yml)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Live demo](https://img.shields.io/badge/%F0%9F%A4%97%20demo-Hugging%20Face%20Space-yellow.svg)](https://huggingface.co/spaces/M7mdehab/solar-site-selection)
 
 **Draw an area on a map, get a defensible PV siting analysis.**
 
-<!-- demo GIF is added at deploy time once the hosted instance is live -->
+**▶ Live demo:** <https://huggingface.co/spaces/M7mdehab/solar-site-selection> — the
+preset Northwest-Coast-of-Egypt AOI runs end-to-end from a baked offline cache,
+so it works without any third-party API calls.
+
+<!-- demo GIF is added once a recording of the hosted instance is captured -->
 ![demo](docs/assets/demo.gif)
 
 ---

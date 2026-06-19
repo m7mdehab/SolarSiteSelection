@@ -166,7 +166,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--space",
-        default="m7mdehab/solar-site-selection",
+        default="M7mdehab/solar-site-selection",
         help="HF Space id (owner/name)",
     )
     parser.add_argument("--dry-run", action="store_true", help="List files, do not upload")
