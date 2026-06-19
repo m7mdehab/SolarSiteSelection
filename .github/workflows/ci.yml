@@ -46,7 +46,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build image
-        run: docker build -t solarsite:ci .
+        run: |
+          set -o pipefail
+          docker build -t solarsite:ci . 2>&1 | tee /tmp/build.log
+      - name: Surface build failure
+        if: failure()
+        run: |
+          echo "::group::docker build tail"; tail -n 80 /tmp/build.log || true; echo "::endgroup::"
+          grep -nE "error|ERROR|failed|Failed|not found|No such|exit code|Cannot|denied" /tmp/build.log | tail -n 25 | while IFS= read -r l; do echo "::error::${l}"; done
       - name: Report image size
         run: |
           SIZE=$(docker image inspect solarsite:ci --format '{{.Size}}')
@@ -55,10 +62,16 @@ jobs:
       - name: Run container and verify healthcheck + API
         run: |
           docker run -d --name solarsite -p 7860:7860 solarsite:ci
-          for i in $(seq 1 30); do
-            if curl -fsS http://localhost:7860/health; then echo " — health OK"; break; fi
+          ok=0
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:7860/health >/dev/null 2>&1; then ok=1; echo "health OK after ${i} tries"; break; fi
             sleep 2
           done
+          if [ "$ok" -ne 1 ]; then echo "container did not become healthy"; docker logs solarsite | tail -n 60; exit 1; fi
           curl -fsS http://localhost:7860/health | grep -q '"status":"ok"'
           curl -fsS http://localhost:7860/criteria | grep -q economic
           docker rm -f solarsite
+      - name: Surface container logs on failure
+        if: failure()
+        run: |
+          docker logs solarsite 2>&1 | tail -n 60 | while IFS= read -r l; do echo "::error::${l}"; done || true
