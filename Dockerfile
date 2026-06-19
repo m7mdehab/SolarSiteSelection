@@ -30,7 +30,8 @@ ENV UV_SYSTEM_PYTHON=1 \
     UV_COMPILE_BYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PORT=7860 \
-    SOLARSITE_WEB_DIST=/app/web/dist
+    SOLARSITE_WEB_DIST=/app/web/dist \
+    SOLARSITE_CACHE_DIR=/app/data/cache
 
 WORKDIR /app
 
@@ -52,6 +53,8 @@ RUN uv sync --locked --no-dev
 # gitignored); at deploy (P4.4) the HF Space build context carries the real
 # ~2 MB cache, uploaded by scripts/deploy_hf.py.
 COPY data/cache/ ./data/cache/
+# Diagnostic: record how many cache layers were baked in (visible in build logs).
+RUN echo "baked cache files: $(find data/cache -type f | wc -l)" && ls -la data/cache
 
 EXPOSE 7860
 

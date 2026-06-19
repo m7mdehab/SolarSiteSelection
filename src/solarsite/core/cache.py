@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
@@ -41,8 +42,15 @@ log = logging.getLogger(__name__)
 CacheValue = xr.DataArray | gpd.GeoDataFrame
 T = TypeVar("T", xr.DataArray, gpd.GeoDataFrame)
 
-# Default cache directory (relative to cwd — callers should pass an explicit root)
-_DEFAULT_CACHE_ROOT = Path("data/cache")
+# Default cache directory. Resolved at instantiation from $SOLARSITE_CACHE_DIR
+# (absolute in the Docker image, e.g. /app/data/cache) so the cache location does
+# NOT depend on the process CWD; falls back to "data/cache" relative to CWD.
+_CACHE_DIR_ENV = "SOLARSITE_CACHE_DIR"
+_DEFAULT_CACHE_ROOT_REL = "data/cache"
+
+
+def _default_cache_root() -> Path:
+    return Path(os.environ.get(_CACHE_DIR_ENV, _DEFAULT_CACHE_ROOT_REL))
 
 
 class CacheKey:
@@ -73,8 +81,8 @@ class DiskCache:
         root: Cache root directory.  Created on first write if it doesn't exist.
     """
 
-    def __init__(self, root: Path | str = _DEFAULT_CACHE_ROOT) -> None:
-        self.root = Path(root)
+    def __init__(self, root: Path | str | None = None) -> None:
+        self.root = Path(root) if root is not None else _default_cache_root()
 
     # ------------------------------------------------------------------
     # Public API
