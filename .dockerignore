@@ -1,0 +1,28 @@
+# Keep the build context small and reproducible.
+.git
+.github
+_pm/
+data/
+tests/
+docs/
+*.md
+!README.md
+
+# Python caches / local envs
+.venv/
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node (frontend is built in-image from source + lockfile)
+web/node_modules/
+web/dist/
+web/.vite/
+web/playwright-report/
+web/test-results/
+
+# Secrets / local
+.env

@@ -429,3 +429,39 @@ def get_report(job_id: str) -> Response:
         ) from exc
 
     return Response(content=pdf_bytes, media_type="application/pdf")
+
+
+# ---------------------------------------------------------------------------
+# GET /health  (container healthcheck)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Liveness probe for the container healthcheck."""
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Static frontend (served by the same container at :7860)
+# ---------------------------------------------------------------------------
+# Mounted LAST so the API routes above take precedence. The built SPA lives at
+# $SOLARSITE_WEB_DIST (default <repo>/web/dist). Absent in dev/test → not mounted.
+
+
+def _mount_frontend() -> None:
+    import os
+    from pathlib import Path
+
+    from fastapi.staticfiles import StaticFiles
+
+    default_dist = Path(__file__).resolve().parents[3] / "web" / "dist"
+    dist = Path(os.environ.get("SOLARSITE_WEB_DIST", str(default_dist)))
+    if dist.is_dir():
+        app.mount("/", StaticFiles(directory=str(dist), html=True), name="frontend")
+        log.info("Serving frontend from %s", dist)
+    else:
+        log.info("No frontend build at %s; serving API only.", dist)
+
+
+_mount_frontend()

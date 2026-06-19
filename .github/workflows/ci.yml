@@ -40,3 +40,25 @@ jobs:
           grep -nE "FAILED|^E |Error|Exception|assert" /tmp/pytest.log | tail -n 25 | while IFS= read -r line; do
             echo "::error::${line}"
           done
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t solarsite:ci .
+      - name: Report image size
+        run: |
+          SIZE=$(docker image inspect solarsite:ci --format '{{.Size}}')
+          echo "Image size: $((SIZE/1024/1024)) MB"
+          test "$SIZE" -lt 3221225472  # < 3 GB (plan gate)
+      - name: Run container and verify healthcheck + API
+        run: |
+          docker run -d --name solarsite -p 7860:7860 solarsite:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:7860/health; then echo " — health OK"; break; fi
+            sleep 2
+          done
+          curl -fsS http://localhost:7860/health | grep -q '"status":"ok"'
+          curl -fsS http://localhost:7860/criteria | grep -q economic
+          docker rm -f solarsite
