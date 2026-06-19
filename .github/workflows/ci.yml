@@ -95,6 +95,16 @@ jobs:
       - name: Build
         run: npm run build
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: |
+          set -o pipefail
+          npx playwright install --with-deps chromium 2>&1 | tee /tmp/pw_install.log
       - name: Playwright acceptance test
-        run: npx playwright test
+        run: |
+          set -o pipefail
+          npx playwright test 2>&1 | tee /tmp/pw_test.log
+      - name: Surface web failure
+        if: failure()
+        run: |
+          echo "::group::playwright install tail"; tail -n 40 /tmp/pw_install.log 2>/dev/null || true; echo "::endgroup::"
+          echo "::group::playwright test tail"; tail -n 80 /tmp/pw_test.log 2>/dev/null || true; echo "::endgroup::"
+          { tail -n 30 /tmp/pw_test.log 2>/dev/null; tail -n 15 /tmp/pw_install.log 2>/dev/null; } | grep -niE "error|fail|timeout|expect|webgl|gl |not found|No such|exit code|Cannot" | tail -n 25 | while IFS= read -r l; do echo "::error::${l}"; done
