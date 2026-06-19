@@ -34,8 +34,8 @@ Throughout this document, thresholds are labelled:
 - **PUBLIC (Habib 2020 abstract)** — value confirmed in the publicly-accessible
   text (abstract or publicly-visible supplementary material) of Habib et al. 2020.
 - **Literature-standard default** — value from mainstream PV-siting MCDA
-  literature (Al Garni & Awasthi 2017; Sánchez-Lozano et al. 2013;
-  NASA/ESRA PV siting guidelines); not specific to Habib 2020.
+  literature (Al Garni & Awasthi 2017; Sánchez-Lozano et al. 2013); not
+  specific to Habib 2020.
 
 The paper's full pairwise AHP comparison matrices are published in supplementary
 material accessible only through the journal paywall. **The weights used in this

@@ -190,7 +190,7 @@ For a narrative history of design decisions, see
 **Data vintages.** The reference paper (Habib et al. 2020) used data from
 approximately 2018. This engine uses ESA WorldCover v2 2021, PVGIS 5.2
 (2005–2020 climatology), Copernicus GLO-30 (2021–2022), and Open-Meteo ERA5
-reanalysis (2021–2024). Land cover classifications and infrastructure locations
+reanalysis (year 2023). Land cover classifications and infrastructure locations
 along the Matrouh coast have changed in that interval.
 
 **Point-interpolated climate layers.** PVGIS and Open-Meteo deliver data at

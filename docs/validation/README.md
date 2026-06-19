@@ -29,7 +29,7 @@ supplementary material, accessible only through the journal paywall.
 **We use documented MCDA default weights** from `configs/criteria.yaml`.
 These weights are labelled `literature-standard default` in the YAML and
 draw on mainstream PV-siting literature (Al Garni & Awasthi 2017;
-Sánchez-Lozano et al. 2013; NASA/ESRA PV siting guidelines).  They are NOT
+Sánchez-Lozano et al. 2013).  They are NOT
 the paper's weights.  Any numerical comparison is therefore a comparison of
 two independent analyses over the same geography, not a check of
 computational fidelity.
@@ -42,11 +42,11 @@ computational fidelity.
 |----------|-----------|------------|
 | Study area | Alexandria + Matrouh NW coast, ~1,048 km² | NW coast AOI (27–28°E, 31–31.5°N), **5,280.6 km²** |
 | Resolution | Not stated (estimated 30–250 m) | **500 m** |
-| DEM source | SRTM 30 m (2018 context) | Copernicus GLO-30 (2021–2022) |
-| Solar radiation | PVGIS / Copernicus ERA5 era | PVGIS 5.2 (2021–2024 climatology) |
+| DEM source | SRTM DEM (resolution not stated) | Copernicus GLO-30 (2021–2022) |
+| Solar radiation | Not stated | PVGIS 5.2 (2005–2020 climatology) |
 | Land cover | Not stated | ESA WorldCover v2 2021 |
-| Proximity | Not stated | OSM extract (2023–2024) |
-| Climate | Not stated | Open-Meteo ERA5 reanalysis (2021–2024) |
+| Proximity | Not stated | OSM (queried 2026) |
+| Climate | Not stated | Open-Meteo ERA5 reanalysis (year 2023) |
 
 The most important difference is spatial extent: our AOI covers roughly
 **five times** the paper's study area.  Our AOI extends further east (to 28°E)
@@ -125,9 +125,9 @@ terrain excluded by the water-body mask.
 ## Discussion of divergences
 
 ### 1. Different data vintages
-Our sources (ESA WorldCover 2021, PVGIS 5.2 2021–2024, Open-Meteo ERA5
-2021–2024, Copernicus GLO-30 2021) reflect conditions 3–6 years later than
-the paper's data (estimated 2018 vintage).  Solar radiation climatology and
+Our sources (ESA WorldCover 2021, PVGIS 5.2 2005–2020 climatology, Open-Meteo
+ERA5 year 2023, Copernicus GLO-30 2021) are largely contemporary with or later
+than the paper's data (estimated 2018 vintage).  Solar radiation climatology and
 land-cover classifications may differ, particularly along the Matrouh coast
 where development has continued.
 
