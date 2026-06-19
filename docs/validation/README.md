@@ -2,10 +2,10 @@
 
 ## Reference
 
-Habib, A., Saber, I., Elhag, M., Mansour, S., & Hereher, M. E. (2020).
-Identification of potential solar energy sites in Egypt using GIS-based
-multi-criteria analysis. *Remote Sensing Applications: Society and
-Environment*, 20, 100313.
+Habib, S. M., Suliman, A. E. E., Al Nahry, A. H., & Abd El Rahman, E. N. (2020).
+Spatial modeling for the optimum site selection of solar photovoltaics power
+plant in the northwest coast of Egypt. *Remote Sensing Applications: Society and
+Environment*, 18, 100313.
 <https://doi.org/10.1016/j.rsase.2020.100313>
 
 ---
