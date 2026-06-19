@@ -505,20 +505,38 @@ async def test_sites_before_done_returns_409(client: AsyncClient) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tests: report.pdf → 501
+# Tests: report.pdf (200 + PDF where WeasyPrint libs exist, else 501)
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_report_pdf_returns_501(client: AsyncClient) -> None:
-    """GET /jobs/{id}/report.pdf → 501 until P3.3 (stub renderer)."""
+async def test_report_pdf(client: AsyncClient) -> None:
+    """GET /jobs/{id}/report.pdf.
+
+    P3.3 wired up a WeasyPrint renderer. Where WeasyPrint's native libs are
+    available (Linux CI / Docker) the route returns 200 with a real PDF; where
+    they are absent (Windows host) ``render_report`` raises NotImplementedError
+    and the route returns 501. Environment-aware so it is correct on both.
+    """
     job_id = await submit_job(client)
     state = await poll_until_done(client, job_id)
     assert state["status"] == "done"
 
+    try:
+        import weasyprint  # noqa: F401
+
+        weasyprint_available = True
+    except (ImportError, OSError):
+        weasyprint_available = False
+
     resp = await client.get(f"/jobs/{job_id}/report.pdf")
-    assert resp.status_code == 501
-    assert "not yet implemented" in resp.text.lower() or "not implemented" in resp.text.lower()
+    if weasyprint_available:
+        assert resp.status_code == 200, resp.text
+        assert resp.headers["content-type"] == "application/pdf"
+        assert resp.content[:4] == b"%PDF"
+    else:
+        assert resp.status_code == 501
+        assert "implement" in resp.text.lower()
 
 
 # ---------------------------------------------------------------------------
