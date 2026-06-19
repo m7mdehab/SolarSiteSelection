@@ -1,6 +1,6 @@
 # --- project-local, never committed ---
 _pm/
-data/
+/data/
 .env
 
 # --- python ---

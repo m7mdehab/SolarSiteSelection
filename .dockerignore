@@ -2,7 +2,7 @@
 .git
 .github
 _pm/
-data/
+/data/
 tests/
 docs/
 *.md
