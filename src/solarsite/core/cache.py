@@ -127,11 +127,11 @@ class DiskCache:
         key = CacheKey(source, aoi_hash, params)
         meta = self._meta_path(key)
         if meta.exists():
-            raw_path = self._read_meta(key).get("data_path")
-            if raw_path is not None:
-                data_path = Path(str(raw_path))
-                if data_path.exists():
-                    data_path.unlink()
+            dtype = str(self._read_meta(key).get("dtype", ""))
+            suffix = ".nc" if dtype == "DataArray" else ".gpkg"
+            data_path = self._data_stem(key).with_suffix(suffix)
+            if data_path.exists():
+                data_path.unlink()
             meta.unlink()
 
     # ------------------------------------------------------------------
@@ -165,13 +165,13 @@ class DiskCache:
             to_save = value if value.name is not None else value.rename("data")
             to_save.to_netcdf(str(data_path))
             meta["dtype"] = "DataArray"
-            meta["data_path"] = str(data_path)
+            meta["data_path"] = data_path.name  # basename only — platform-neutral
             meta["da_name"] = str(to_save.name)
         elif isinstance(value, gpd.GeoDataFrame):
             data_path = self._data_stem(key).with_suffix(".gpkg")
             value.to_file(str(data_path), driver="GPKG")
             meta["dtype"] = "GeoDataFrame"
-            meta["data_path"] = str(data_path)
+            meta["data_path"] = data_path.name  # basename only — platform-neutral
         else:
             raise TypeError(f"Unsupported value type: {type(value)}")
 
@@ -184,11 +184,15 @@ class DiskCache:
             return None
 
         meta = self._read_meta(key)
-        data_path = Path(str(meta["data_path"]))
+        dtype = str(meta.get("dtype", ""))
+        suffix = ".nc" if dtype == "DataArray" else ".gpkg"
+        # Reconstruct the data path from the CURRENT root + key, NOT from
+        # meta["data_path"] — that string carries whatever platform seeded the
+        # cache (e.g. Windows backslashes) and would not resolve on another OS.
+        data_path = self._data_stem(key).with_suffix(suffix)
         if not data_path.exists():
             return None
 
-        dtype = str(meta.get("dtype", ""))
         if dtype == "DataArray":
             # Open as a Dataset with decode_coords="all" so a `spatial_ref`
             # grid-mapping variable is restored as a coordinate (not a data var),

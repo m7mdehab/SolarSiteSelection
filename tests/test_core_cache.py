@@ -66,6 +66,37 @@ def test_roundtrip_dataarray_with_crs(tmp_path: Path) -> None:
     assert second.name == "test_layer"
 
 
+def test_load_ignores_foreign_platform_data_path(tmp_path: Path) -> None:
+    """Cache reload must not depend on the stored data_path string.
+
+    Regression: the meta JSON recorded a platform-specific data_path (e.g.
+    Windows backslashes from a Windows seed). On Linux that string did not
+    resolve, so _load returned None → cache miss → the deployed demo fell
+    through to live acquisition. _load must reconstruct the path from root+key.
+    """
+    import json
+
+    cache = DiskCache(tmp_path)
+    cache.get_or_compute("src", "hash", {"r": 100}, _make_dataarray)
+
+    # Corrupt the stored data_path to a bogus foreign-OS string.
+    meta_file = next(tmp_path.glob("*.json"))
+    meta = json.loads(meta_file.read_text())
+    meta["data_path"] = r"C:\seeded\on\windows\whatever.nc"
+    meta_file.write_text(json.dumps(meta))
+
+    calls = {"n": 0}
+
+    def compute() -> xr.DataArray:
+        calls["n"] += 1
+        return _make_dataarray()
+
+    # Must still HIT (reconstruct path from root+key), not recompute.
+    result = cache.get_or_compute("src", "hash", {"r": 100}, compute)
+    assert calls["n"] == 0, "reload wrongly depended on the stored data_path string"
+    assert result is not None
+
+
 def _make_geodataframe() -> gpd.GeoDataFrame:
     """Return a small deterministic GeoDataFrame."""
     polys = [box(0, 0, 1, 1), box(2, 0, 3, 1)]
