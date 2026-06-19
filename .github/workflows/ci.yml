@@ -14,9 +14,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install WeasyPrint system libraries
+        # WeasyPrint 60+ renders via Pango + FreeType (libpangoft2); it no longer
+        # needs Cairo/gdk-pixbuf. Fonts are required or text rendering raises.
         run: |
           sudo apt-get update
-          sudo apt-get install -y libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev libcairo2
+          sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0 libpangocairo-1.0-0 fonts-dejavu-core fontconfig
       - name: Sync dependencies
         run: uv sync --locked
       - name: Lint
