@@ -153,6 +153,7 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
     root.render(
       <SitePopup
         props={site.properties}
+        testIdPrefix="map-site"
         onClose={() => {
           popup.remove();
           dispatch({ type: 'SET_SELECTED_SITE', site: null });

@@ -4,11 +4,15 @@ import '../styles/SitePopup.css';
 interface SitePopupProps {
   props: SiteProperties;
   onClose?: () => void;
+  // Namespaces the data-testids so the side-panel and map-popup instances of
+  // this component never collide (Playwright strict mode). Defaults to "site"
+  // (the canonical instance the acceptance test targets).
+  testIdPrefix?: string;
 }
 
-export function SitePopup({ props, onClose }: SitePopupProps) {
+export function SitePopup({ props, onClose, testIdPrefix = 'site' }: SitePopupProps) {
   return (
-    <div className="site-popup" data-testid="site-popup">
+    <div className="site-popup" data-testid={`${testIdPrefix}-popup`}>
       <div className="site-popup-header">
         <span className="site-popup-rank">Site #{props.rank}</span>
         {onClose && (
@@ -20,7 +24,7 @@ export function SitePopup({ props, onClose }: SitePopupProps) {
       <div className="site-popup-body">
         <div className="site-popup-row">
           <span className="site-popup-label">Area</span>
-          <span className="site-popup-value" data-testid="site-area">
+          <span className="site-popup-value" data-testid={`${testIdPrefix}-area`}>
             {props.area_km2.toFixed(2)} km&sup2;
           </span>
         </div>
@@ -30,7 +34,7 @@ export function SitePopup({ props, onClose }: SitePopupProps) {
         </div>
         <div className="site-popup-row">
           <span className="site-popup-label">Yield</span>
-          <span className="site-popup-value" data-testid="site-yield">
+          <span className="site-popup-value" data-testid={`${testIdPrefix}-yield`}>
             {props.kwh_per_kwp_yr.toFixed(0)} kWh/kWp/yr
           </span>
         </div>
