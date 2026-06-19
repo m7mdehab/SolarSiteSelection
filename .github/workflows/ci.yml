@@ -28,4 +28,15 @@ jobs:
       - name: Type check
         run: uv run pyright
       - name: Test (offline only — CI never hits live APIs)
-        run: uv run pytest -m "not live and not slow" --cov --cov-report=term
+        run: |
+          set -o pipefail
+          uv run pytest -m "not live and not slow" --cov --cov-report=term -rA --tb=short 2>&1 | tee /tmp/pytest.log
+      - name: Surface failures as annotations
+        if: failure()
+        run: |
+          echo "::group::pytest tail"
+          tail -n 80 /tmp/pytest.log || true
+          echo "::endgroup::"
+          grep -nE "FAILED|^E |Error|Exception|assert" /tmp/pytest.log | tail -n 25 | while IFS= read -r line; do
+            echo "::error::${line}"
+          done
