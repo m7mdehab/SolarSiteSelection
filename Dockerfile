@@ -47,10 +47,11 @@ COPY --from=web /web/dist ./web/dist
 # Install the project itself into the venv.
 RUN uv sync --locked --no-dev
 
-# NOTE: the preset-AOI offline cache (gitignored, ~2 MB) is baked at deploy time
-# (P4.4) — the deploy seeds data/cache for the demo AOI and rebuilds, so the
-# public demo needs zero third-party API calls at runtime. The base image builds
-# fully offline (no cache, no network) so CI can verify it.
+# Bake the preset-AOI offline cache so the public demo needs zero third-party API
+# calls at runtime. In CI this is just the .gitkeep marker (the real cache is
+# gitignored); at deploy (P4.4) the HF Space build context carries the real
+# ~2 MB cache, uploaded by scripts/deploy_hf.py.
+COPY data/cache/ ./data/cache/
 
 EXPOSE 7860
 

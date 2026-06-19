@@ -1,6 +1,13 @@
 # --- project-local, never committed ---
 _pm/
-/data/
+# Ignore everything under data/ EXCEPT an empty marker for the cache dir, so the
+# path exists in fresh clones / CI build context. The real cached datasets stay
+# ignored; the offline demo cache is uploaded only to the Hugging Face Space at
+# deploy time.
+/data/*
+!/data/cache/
+/data/cache/*
+!/data/cache/.gitkeep
 .env
 
 # --- python ---

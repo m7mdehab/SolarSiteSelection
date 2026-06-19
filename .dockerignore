@@ -2,7 +2,11 @@
 .git
 .github
 _pm/
-/data/
+# Exclude data/ except the demo cache (baked into the image so the preset AOI
+# runs offline; in CI this is just the .gitkeep marker, at deploy it is the
+# real ~2 MB cache uploaded to the HF Space).
+/data/*
+!/data/cache
 tests/
 docs/
 *.md

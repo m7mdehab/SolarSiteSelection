@@ -36,6 +36,7 @@ dev = [
     "hypothesis>=6.92",
     "ruff>=0.6",
     "pyright>=1.1.380",
+    "huggingface-hub>=0.24",
 ]
 
 [build-system]
