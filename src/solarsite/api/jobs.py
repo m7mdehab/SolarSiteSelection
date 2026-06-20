@@ -66,6 +66,7 @@ from typing import Any
 import geopandas as gpd
 import matplotlib as mpl
 import numpy as np
+import pandas as pd
 import rioxarray  # noqa: F401  registers the .rio accessor on xarray objects
 import xarray as xr
 from pyproj import CRS, Transformer
@@ -82,6 +83,7 @@ from solarsite.analysis import (
     site_energy_from_ghi,
     weighted_overlay,
 )
+from solarsite.analysis.energy import EnergyAssumptions, site_energy
 from solarsite.api.schemas import (
     AcquireSourceStage,
     JobState,
@@ -89,6 +91,7 @@ from solarsite.api.schemas import (
     StageStatus,
 )
 from solarsite.core import AOI
+from solarsite.validation import check_energy_result
 
 log = logging.getLogger(__name__)
 
@@ -397,13 +400,42 @@ def _run_analysis(record: _JobRecord, layers: dict[str, xr.DataArray]) -> None:
         wgs84 = CRS.from_epsg(4326)
         sites_wgs84 = sites.to_crs(wgs84) if sites.crs is not None and sites.crs != wgs84 else sites
         # Add centroid lat/lon for WGS-84 representation
-        sites_out = _enrich_sites(sites_wgs84, record.aoi, layers)
+        tmy_df = _resolve_tmy(record.aoi, layers)
+        sites_out = _enrich_sites(sites_wgs84, record.aoi, layers, tmy_df=tmy_df)
         record.n_sites = len(sites_out)
+        # Honesty: surface which energy model produced the displayed numbers, and
+        # run the physical-sanity gate so an out-of-bounds figure is flagged.
+        if tmy_df is None and "energy_method" in sites_out.columns:
+            record.notes.append(
+                "Site energy is the OFFLINE estimate (GHI*PR, not validation-grade). "
+                "The validation-grade pvlib ModelChain runs when an hourly TMY is "
+                "available for the AOI."
+            )
+        record.notes.extend(_sanity_notes_for_sites(sites_out))
         sites_out.to_file(record.job_dir / "sites.geojson", driver="GeoJSON")
     else:
         record.n_sites = 0
         # Write empty GeoJSON
         (record.job_dir / "sites.geojson").write_text('{"type":"FeatureCollection","features":[]}')
+
+
+def _resolve_tmy(aoi: AOI, layers: dict[str, xr.DataArray]) -> pd.DataFrame | None:
+    """Resolve an hourly TMY DataFrame for the AOI, or ``None`` if unavailable (E3).
+
+    When this returns a TMY, :func:`_enrich_sites` uses the validation-grade pvlib
+    ModelChain for the numbers users see; when it returns ``None`` the pipeline
+    falls back to the explicitly-labelled offline GHI*PR estimate.
+
+    Current behaviour: returns ``None``. The offline preset ships no hourly TMY in
+    its cache, and we do not fetch live PVGIS TMY on every request from inside the
+    request path. Wiring a real TMY source — a PVGIS TMY baked into each preset's
+    cache, and/or a guarded live fetch for drawn AOIs — is tracked in
+    ``_pm/MORNING_QUEUE.md`` as the step that upgrades the *displayed* preset
+    numbers from "offline estimate" to validation-grade. The ModelChain code path
+    is implemented and tested; only this resolver is stubbed.
+    """
+    _ = (aoi, layers)
+    return None
 
 
 def _criterion_key_to_layer_name(key: str) -> str:
@@ -447,14 +479,26 @@ def _enrich_sites(
     sites: gpd.GeoDataFrame,
     aoi: AOI,
     layers: dict[str, xr.DataArray],
+    tmy_df: pd.DataFrame | None = None,
 ) -> gpd.GeoDataFrame:
     """Add per-site energy/economics so every site always carries the fields the
-    UI renders (``kwh_per_kwp_yr``, ``gwh_per_yr``, ``lcoe``, ``capacity_mwp``).
+    UI renders (``kwh_per_kwp_yr``, ``gwh_per_yr``, ``lcoe``, ``capacity_mwp``,
+    plus ``energy_method`` labelling which model produced them).
 
-    Uses the offline GHI-based estimate (:func:`site_energy_from_ghi`) sampled from
-    the cached annual-GHI raster — no network, so the offline preset still works.
-    The fields are ALWAYS populated (numbers), so the frontend never sees an
-    undefined value (the regression that white-screened the app).
+    Energy path (E3):
+
+    * **Default — validation-grade.** When an hourly TMY is available for the AOI
+      (``tmy_df``), each site's yield is the pvlib ModelChain estimate
+      (:func:`site_energy`, ~2.6 % vs PVGIS PVcalc), with the equator-facing
+      geometry and itemized loss stack. ``energy_method = "pvlib_modelchain"``.
+    * **Labelled offline fallback.** When no TMY is available (the offline preset
+      runs with zero network and no hourly TMY baked into its cache), the yield
+      is the cruder GHI*PR estimate (:func:`site_energy_from_ghi`) sampled from
+      the cached annual-GHI raster. ``energy_method = "ghi_pr_offline"`` so the
+      UI can label it "offline estimate — not validation-grade".
+
+    Either way every field is ALWAYS a finite number, so the frontend never sees
+    an undefined value (the regression that white-screened the app).
     """
     _ = aoi
     if len(sites) == 0:
@@ -467,20 +511,64 @@ def _enrich_sites(
         except (TypeError, ValueError):
             return 0.0
 
+    has_tmy = tmy_df is not None and len(tmy_df) > 0
+    assumptions = EnergyAssumptions()
     out = sites.copy()
-    sy_list, gwh_list, lcoe_list, cap_list = [], [], [], []
+    sy_list, gwh_list, lcoe_list, cap_list, method_list = [], [], [], [], []
     for _, row in out.iterrows():
-        ghi = _site_ghi(layers, _rf(row, "centroid_x"), _rf(row, "centroid_y"))
-        e = site_energy_from_ghi(ghi, _rf(row, "area_km2"))
+        area_km2 = _rf(row, "area_km2")
+        e = None
+        if has_tmy and tmy_df is not None:
+            # Per-site ModelChain using the AOI TMY at the site centroid lat/lon.
+            lat = _rf(row, "centroid_lat")
+            lon = _rf(row, "centroid_lon")
+            try:
+                e = site_energy(lat, lon, area_km2, tmy_df, assumptions)
+            except Exception as exc:  # pragma: no cover - defensive
+                log.warning("ModelChain failed for site; falling back to GHI*PR: %s", exc)
+                e = None
+        if e is None:
+            ghi = _site_ghi(layers, _rf(row, "centroid_x"), _rf(row, "centroid_y"))
+            e = site_energy_from_ghi(ghi, area_km2)
         sy_list.append(round(e.specific_yield_kwh_kwp_yr, 1))
         gwh_list.append(round(e.annual_gwh, 3))
         lcoe_list.append(round(e.lcoe_usd_per_mwh / 1000.0, 5))  # USD/kWh for the UI
         cap_list.append(round(e.capacity_mwp, 2))
+        method_list.append(e.method)
     out["kwh_per_kwp_yr"] = sy_list
     out["gwh_per_yr"] = gwh_list
     out["lcoe"] = lcoe_list
     out["capacity_mwp"] = cap_list
+    out["energy_method"] = method_list
     return out
+
+
+def _sanity_notes_for_sites(sites: gpd.GeoDataFrame) -> list[str]:
+    """Run the physical-sanity gate on each site's displayed numbers (Track F).
+
+    Returns human-readable caveat strings for any site whose specific yield,
+    implied capacity factor, power density, or LCOE escapes its physical
+    envelope. The pipeline appends these to the job ``notes`` so an out-of-bounds
+    number is surfaced — never silently displayed — and the job still completes
+    (graceful degradation, not a crash).
+    """
+    notes: list[str] = []
+    for _, row in sites.iterrows():
+        sy = float(row.get("kwh_per_kwp_yr", 0.0) or 0.0)
+        area = float(row.get("area_km2", 0.0) or 0.0)
+        cap = float(row.get("capacity_mwp", 0.0) or 0.0)
+        lcoe_mwh = float(row.get("lcoe", 0.0) or 0.0) * 1000.0  # UI stores USD/kWh
+        rank = int(float(row.get("rank", 0) or 0))
+        checks = check_energy_result(
+            sy,
+            area_km2=area if area > 0 else None,
+            capacity_mwp=cap if cap > 0 else None,
+            lcoe_usd_per_mwh=lcoe_mwh if lcoe_mwh > 0 else None,
+        )
+        for c in checks:
+            if not c.ok:
+                notes.append(f"Site rank {rank}: {c.message}")
+    return notes
 
 
 def _save_layer(job_dir: Path, name: str, da: xr.DataArray) -> None:

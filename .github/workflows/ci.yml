@@ -31,6 +31,20 @@ jobs:
         run: |
           set -o pipefail
           uv run pytest -m "not live and not slow" --cov --cov-report=term --cov-fail-under=80 -rA --tb=short 2>&1 | tee /tmp/pytest.log
+      - name: Physical-sanity + displayed-number gate (Track F)
+        # Explicit, separately-attributed gate: every headline number must sit
+        # inside its physical envelope (specific yield, capacity factor, power
+        # density, $/W, payback, per-roof capacity), and the pipeline must label
+        # which energy model produced the displayed figures. A bug here fails CI
+        # independently of the broad suite above.
+        run: |
+          set -o pipefail
+          uv run pytest tests/test_sanity.py tests/test_jobs_pipeline.py tests/test_losses.py -q 2>&1 | tee /tmp/sanity.log
+      - name: Surface sanity-gate failure
+        if: failure()
+        run: |
+          echo "::group::sanity gate tail"; tail -n 60 /tmp/sanity.log 2>/dev/null || true; echo "::endgroup::"
+          grep -nE "FAILED|envelope|ceiling|assert" /tmp/sanity.log 2>/dev/null | tail -n 20 | while IFS= read -r l; do echo "::error::${l}"; done
       - name: Surface failures as annotations
         if: failure()
         run: |

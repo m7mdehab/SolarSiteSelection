@@ -12,6 +12,14 @@ export function RankingTable() {
     (a, b) => a.properties.rank - b.properties.rank
   );
 
+  const method = sorted[0]?.properties.energy_method;
+  const methodLabel =
+    method === 'pvlib_modelchain'
+      ? 'Energy: pvlib ModelChain (validation-grade)'
+      : method === 'ghi_pr_offline'
+        ? 'Energy: offline GHI×PR estimate (not validation-grade)'
+        : null;
+
   function handleSelect(site: SiteFeature) {
     dispatch({ type: 'SET_SELECTED_SITE', site });
   }
@@ -52,6 +60,11 @@ export function RankingTable() {
           })}
         </tbody>
       </table>
+      {methodLabel && (
+        <div className="ranking-method-note" data-testid="energy-method-note">
+          {methodLabel}
+        </div>
+      )}
     </div>
   );
 }

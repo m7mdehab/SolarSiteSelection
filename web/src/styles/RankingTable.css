@@ -60,3 +60,10 @@
 .ranking-row-selected td {
   color: var(--color-accent-dark);
 }
+
+.ranking-method-note {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+  font-style: italic;
+  padding-top: 2px;
+}

@@ -15,16 +15,36 @@ from pathlib import Path
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 import rioxarray  # noqa: F401  # registers the .rio accessor
 import xarray as xr
 from pyproj import CRS
 from shapely.geometry import box
 
-from solarsite.api.jobs import _enrich_sites, _save_layer
+from solarsite.api.jobs import _enrich_sites, _sanity_notes_for_sites, _save_layer
 from solarsite.core import AOI
 
 _UTM35N = CRS.from_epsg(32635)
+
+
+def _synthetic_tmy() -> pd.DataFrame:
+    """A simple 8760-hour diurnal TMY (tz-aware) sufficient for ModelChain."""
+    idx = pd.date_range("2005-01-01", periods=8760, freq="h", tz="UTC")
+    hour = np.array([ts.hour for ts in idx], dtype=float)
+    # Daylight bell 06:00-18:00, peak ~900 W/m² at noon; 0 at night.
+    day = np.clip(np.sin((hour - 6.0) / 12.0 * np.pi), 0.0, None)
+    ghi = 900.0 * day
+    return pd.DataFrame(
+        {
+            "ghi": ghi,
+            "dni": 700.0 * day,
+            "dhi": 200.0 * day,
+            "temp_air": np.full(8760, 25.0),
+            "wind_speed": np.full(8760, 2.0),
+        },
+        index=idx,
+    )
 
 
 def _ghi_layer() -> xr.DataArray:
@@ -75,6 +95,43 @@ def test_enrich_sites_no_ghi_layer_still_populates() -> None:
     )
     out = _enrich_sites(_sites_gdf(), aoi, {})
     assert np.all(np.isfinite(out["kwh_per_kwp_yr"].to_numpy(dtype=float)))
+
+
+def _aoi() -> AOI:
+    return AOI.from_geojson(
+        {"type": "Polygon", "coordinates": [[[27, 31], [28, 31], [28, 31.5], [27, 31.5], [27, 31]]]}
+    )
+
+
+def test_enrich_sites_offline_labels_method() -> None:
+    """Without a TMY, the offline GHI*PR path is used AND labelled (E3)."""
+    out = _enrich_sites(_sites_gdf(), _aoi(), {"ghi_annual": _ghi_layer()})
+    assert (out["energy_method"] == "ghi_pr_offline").all()
+
+
+def test_enrich_sites_modelchain_is_default_when_tmy_present() -> None:
+    """With a TMY available, displayed numbers come from pvlib ModelChain (E3)."""
+    sites = _sites_gdf()
+    sites["centroid_lat"] = [31.2, 31.1]
+    sites["centroid_lon"] = [27.4, 27.6]
+    out = _enrich_sites(sites, _aoi(), {"ghi_annual": _ghi_layer()}, tmy_df=_synthetic_tmy())
+    assert (out["energy_method"] == "pvlib_modelchain").all()
+    sy = out["kwh_per_kwp_yr"].to_numpy(dtype=float)
+    assert np.all(np.isfinite(sy)) and np.all(sy > 0)
+
+
+def test_sanity_notes_empty_for_good_sites() -> None:
+    """A realistic offline result produces no sanity violations."""
+    out = _enrich_sites(_sites_gdf(), _aoi(), {"ghi_annual": _ghi_layer()})
+    assert _sanity_notes_for_sites(out) == []
+
+
+def test_sanity_notes_flag_impossible_specific_yield() -> None:
+    """An out-of-envelope displayed number is surfaced as a caveat, not hidden."""
+    out = _enrich_sites(_sites_gdf(), _aoi(), {"ghi_annual": _ghi_layer()})
+    out.loc[out.index[0], "kwh_per_kwp_yr"] = 9999.0  # impossible
+    notes = _sanity_notes_for_sites(out)
+    assert any("outside physical envelope" in n for n in notes)
 
 
 def test_save_layer_lsi_saves_and_loads_numeric(

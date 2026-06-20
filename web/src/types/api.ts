@@ -100,6 +100,9 @@ export interface SiteProperties {
   kwh_per_kwp_yr: number;
   gwh_per_yr: number;
   lcoe: number;
+  // Which model produced the energy figures (E3):
+  //   'pvlib_modelchain' = validation-grade; 'ghi_pr_offline' = offline estimate.
+  energy_method?: string;
 }
 
 export interface SiteFeature extends GeoJSON.Feature {
