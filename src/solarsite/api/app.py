@@ -48,6 +48,8 @@ from solarsite.api.schemas import (
     LsiClassOut,
     ReclassOut,
 )
+from solarsite.consumer import RECOMMENDED_RANGES, ConsumerResult, analyze_rooftop
+from solarsite.consumer.schemas import RooftopAnalysisRequest
 from solarsite.core import AOI, AOIInvalidGeometryError, AOITooLargeError
 
 log = logging.getLogger(__name__)
@@ -429,6 +431,39 @@ def get_report(job_id: str) -> Response:
         ) from exc
 
     return Response(content=pdf_bytes, media_type="application/pdf")
+
+
+# ---------------------------------------------------------------------------
+# POST /consumer/rooftop  (Track B — consumer rooftop mode)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/consumer/rooftop", response_model=ConsumerResult)
+def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
+    """Analyse a household rooftop PV system (separate from the utility engine).
+
+    Capacity derives from the roof area, so this can NEVER produce a utility-scale
+    figure. Energy outputs are real; monetary outputs are ``null`` whenever their
+    region-specific input is an unverified ``NEEDS_HUMAN_DECISION`` stub, with the
+    missing inputs named in ``economics.unverified_inputs`` and ``caveats``. The
+    physical-sanity gate result is in ``sanity_ok`` / ``sanity_messages``.
+    """
+    return analyze_rooftop(
+        roof=body.roof,
+        specific_yield_kwh_kwp_yr=body.specific_yield_kwh_kwp_yr,
+        consumption=body.consumption,
+        econ=body.economics,
+    )
+
+
+@app.get("/consumer/recommended-ranges")
+def consumer_recommended_ranges() -> dict[str, dict[str, str]]:
+    """Published RANGES (not values) for the stubbed economic inputs + their sources.
+
+    For the UI / morning queue to inform a human decision; the engine never
+    consumes these as values.
+    """
+    return RECOMMENDED_RANGES
 
 
 # ---------------------------------------------------------------------------
