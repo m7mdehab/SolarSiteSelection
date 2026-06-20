@@ -24,10 +24,8 @@ Decision: UTM zone of the centroid, WGS-84 datum.
   EPSG = 32600 + zone  (North)
   EPSG = 32700 + zone  (South)
 
-DECISIONS entry (for the Master Agent to copy):
-| 6 | Working CRS: UTM zone of AOI centroid (WGS-84) | Metric, low-distortion, |
-|   | EPSG:326xx (N) / 327xx (S).  Global applicability. | valid for <=10,000 km2 AOIs; |
-|   |  | Egypt spans 35 N-36 N; auto-handled. |
+Rationale: metric and low-distortion (valid for AOIs up to ~10,000 km2), globally
+applicable. Egypt spans UTM zones 35 N-36 N; the centroid lookup auto-selects.
 """
 
 from __future__ import annotations

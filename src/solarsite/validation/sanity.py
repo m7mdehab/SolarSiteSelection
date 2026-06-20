@@ -9,10 +9,11 @@ precise point estimates and must never be read as "the expected value."
 Provenance of the envelopes (each verified against its cited source):
 
 * Specific yield — World Bank/ESMAP/Solargis *Global Photovoltaic Power Potential
-  by Country* (2020): 93 % of population lives where daily PVOUT is 3.0-5.0
-  kWh/kWp (≈1,095-1,825 kWh/kWp/yr); best countries (Namibia) ~6 kWh/kWp/day.
-  Generic specific-yield band 1,000-2,000+ kWh/kWp/yr (Solar Power World). Hard
-  fixed-tilt ceiling ~2,200; we use [500, 2600] as the *certainly-a-bug* envelope.
+  by Country* (2020), primary-verified: "93 % of the global population lives in
+  countries where the average daily PV potential is in the range between 3.0 and
+  5.0 kWh/kWp" (≈1,095-1,825 kWh/kWp/yr); the top 70 countries exceed 4.5 kWh/kWp/day
+  (Namibia highest, ~factor 2 over Ireland). Hard fixed-tilt ceiling ~2,200; we use
+  [500, 2600] as a deliberately wide *certainly-a-bug* envelope (not a point figure).
 * AC capacity factor — LBNL *Utility-Scale Solar, 2023 Edition*: plant CF 9-35 %
   (AC basis), median 24 % (sample mixes fixed-tilt + tracking). NREL ATB 2024
   utility tracking up to ~34 %. Fixed-tilt typically 10-28 %. Hard [0.02, 0.40].

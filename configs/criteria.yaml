@@ -9,8 +9,8 @@
 #   literature-standard default   — value from mainstream PV-siting MCDA
 #     literature (Al Garni & Awasthi 2017; Sánchez-Lozano et al. 2013);
 #     not specific to Habib 2020.
-#   PM plan decision              — explicitly set by the project's Master Agent
-#     plan; not derived from any paper.
+#   project default               — a project design choice; not derived from
+#     any paper.
 #
 # Within-group local weights are DEFAULT MCDA weights, refinable via the AHP
 # editor at runtime.  They are NOT published paper weights.
@@ -19,19 +19,19 @@
 # =============================================================================
 
 # ---------------------------------------------------------------------------
-# Global group weights  [PM plan decision]
+# Global group weights  [project design default]
 # Economic 0.50 + Technical 0.25 + Environmental 0.25 = 1.00
 # ---------------------------------------------------------------------------
 groups:
   economic:
     name: Economic
-    weight: 0.50   # PM plan decision
+    weight: 0.50   # project default
   technical:
     name: Technical
-    weight: 0.25   # PM plan decision
+    weight: 0.25   # project default
   environmental:
     name: Environmental
-    weight: 0.25   # PM plan decision
+    weight: 0.25   # project default
 
 # ---------------------------------------------------------------------------
 # LSI classification scheme  [PUBLIC — Habib 2020 abstract]
