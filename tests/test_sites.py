@@ -22,7 +22,7 @@ import pytest
 import rioxarray  # noqa: F401  — registers the .rio accessor on xr.DataArray
 import xarray as xr
 
-from solarsite.analysis.sites import SITE_COLUMNS, extract_sites
+from solarsite.analysis.sites import SITE_COLUMNS, _split_large_regions, extract_sites
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -549,3 +549,52 @@ class TestNoCrs:
         assert len(gdf) == 0
         # CRS is None (no metadata on input), GeoDataFrame is still valid
         assert isinstance(gdf, gpd.GeoDataFrame)
+
+
+# ---------------------------------------------------------------------------
+# 8. A2 — subdivide oversized regions so a whole region isn't one "site"
+# ---------------------------------------------------------------------------
+
+
+class TestMaxSiteAreaSplit:
+    """max_site_area_km2 splits a fused high-LSI region into realistic sub-sites."""
+
+    @staticmethod
+    def _big_region(n: int = 30) -> tuple[xr.DataArray, xr.DataArray]:
+        cls = _class_da(np.full((n, n), 5, dtype=np.int32))  # one n*n km2 block
+        lsi = _lsi_da(np.full((n, n), 0.9, dtype=np.float64))
+        return lsi, cls
+
+    def test_without_cap_one_huge_site(self) -> None:
+        """No cap (None) -> the whole 900 km2 region is a single site (old behaviour)."""
+        lsi, cls = self._big_region(30)
+        gdf = extract_sites(lsi, cls, top_classes=(5,), min_area_km2=0.5, top_k=100)
+        assert len(gdf) == 1
+        assert gdf.iloc[0]["area_km2"] == pytest.approx(900.0)
+
+    def test_cap_splits_into_many_bounded_sites(self) -> None:
+        """With a 50 km2 cap, the region becomes many sites, each <= the cap."""
+        lsi, cls = self._big_region(30)  # 900 km2
+        gdf = extract_sites(
+            lsi, cls, top_classes=(5,), min_area_km2=0.5, max_site_area_km2=50.0, top_k=1000
+        )
+        assert len(gdf) > 1, "oversized region was not split"
+        assert (gdf["area_km2"] <= 50.0 + 1e-6).all(), "a sub-site exceeds the cap"
+        # Total area is preserved across the sub-sites.
+        assert gdf["area_km2"].sum() == pytest.approx(900.0, rel=1e-6)
+
+    def test_split_preserves_total_cells_helper(self) -> None:
+        """_split_large_regions conserves the labelled-cell count."""
+        labeled = np.ones((20, 20), dtype=np.int32)  # one 400-cell region
+        out, n = _split_large_regions(labeled, 1, cell_area_km2=1.0, max_area_km2=50.0)
+        assert n > 1
+        assert int((out > 0).sum()) == int((labeled > 0).sum()) == 400
+
+    def test_small_region_untouched_by_cap(self) -> None:
+        """A region already under the cap is not subdivided."""
+        lsi, cls = self._big_region(5)  # 25 km2 < 50
+        gdf = extract_sites(
+            lsi, cls, top_classes=(5,), min_area_km2=0.5, max_site_area_km2=50.0, top_k=100
+        )
+        assert len(gdf) == 1
+        assert gdf.iloc[0]["area_km2"] == pytest.approx(25.0)

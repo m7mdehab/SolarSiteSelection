@@ -372,6 +372,10 @@ def _run_analysis(record: _JobRecord, layers: dict[str, xr.DataArray]) -> None:
         class_raster,
         top_classes=(5, 4),
         min_area_km2=0.5,
+        # A2: cap a single candidate at ~50 km² (one very large solar park, e.g.
+        # Bhadla ≈ 2.2 GW on ~57 km²) so an 834 km² high-LSI region is split into
+        # multiple realistic sites instead of one misleading "61,557-GWh site".
+        max_site_area_km2=50.0,
         distance_to_ptl=dist_ptl,
         top_k=10,
     )
@@ -411,6 +415,9 @@ def _run_analysis(record: _JobRecord, layers: dict[str, xr.DataArray]) -> None:
                 "The validation-grade pvlib ModelChain runs when an hourly TMY is "
                 "available for the AOI."
             )
+        framing = _aggregate_framing_note(sites_out)
+        if framing:
+            record.notes.append(framing)
         record.notes.extend(_sanity_notes_for_sites(sites_out))
         sites_out.to_file(record.job_dir / "sites.geojson", driver="GeoJSON")
     else:
@@ -540,6 +547,28 @@ def _enrich_sites(
     out["capacity_mwp"] = cap_list
     out["energy_method"] = method_list
     return out
+
+
+def _aggregate_framing_note(sites: gpd.GeoDataFrame) -> str | None:
+    """Honest framing for the utility result (A2): a site is a parcel, not a turn-key
+    decision, and headline comparison should be per-unit.
+
+    Prevents the misread where one large region's annual GWh looks like a single
+    decision when it actually means "fully develop this whole parcel at utility
+    density". Returns ``None`` when there are no sites.
+    """
+    if len(sites) == 0:
+        return None
+    n = len(sites)
+    areas = sites["area_km2"].to_numpy(dtype=float) if "area_km2" in sites else np.array([0.0])
+    largest_area = float(np.max(areas)) if areas.size else 0.0
+    return (
+        f"The {n} candidate site(s) are individual parcels (each capped at 50 km2; "
+        f"largest ~{largest_area:.0f} km2). A site's GWh/yr is the output of fully "
+        f"developing that whole parcel at utility density (~45 MWp/km2) — it is a "
+        f"region-development total, not a single turn-key project. Compare sites by "
+        f"the per-unit figures (capacity MWp, specific yield kWh/kWp/yr, LCOE)."
+    )
 
 
 def _sanity_notes_for_sites(sites: gpd.GeoDataFrame) -> list[str]:

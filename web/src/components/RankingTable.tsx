@@ -33,8 +33,9 @@ export function RankingTable() {
             <th>Rank</th>
             <th>Area km&sup2;</th>
             <th>Mean LSI</th>
+            <th>Capacity MWp</th>
             <th>kWh/kWp/yr</th>
-            <th>GWh/yr</th>
+            <th title="Annual output of fully developing this parcel at utility density">GWh/yr</th>
             <th>LCOE</th>
           </tr>
         </thead>
@@ -52,6 +53,7 @@ export function RankingTable() {
                 <td>{p.rank}</td>
                 <td>{fmt(p.area_km2, 2)}</td>
                 <td>{fmt(p.mean_lsi, 3)}</td>
+                <td>{fmt(p.capacity_mwp, 0)}</td>
                 <td data-testid={`site-yield-${p.rank}`}>{fmt(p.kwh_per_kwp_yr, 0)}</td>
                 <td>{fmt(p.gwh_per_yr, 2)}</td>
                 <td>{fmt(p.lcoe, 4)}</td>

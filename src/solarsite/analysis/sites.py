@@ -150,12 +150,58 @@ def _crs_to_epsg_string(da: xr.DataArray) -> str | None:
     return None
 
 
+def _split_large_regions(
+    labeled_arr: np.ndarray,
+    num_features: int,
+    cell_area_km2: float,
+    max_area_km2: float | None,
+) -> tuple[np.ndarray, int]:
+    """Subdivide any connected component larger than ``max_area_km2`` into a grid
+    of realistically-sized sub-sites (the A2 presentation fix).
+
+    8-connectivity fuses an entire high-LSI region into one polygon, so the
+    pipeline could present an 834 km² region as a single "site" (the misleading
+    61,557-GWh figure). Here, an oversized component is partitioned along a
+    deterministic square grid (tile side ≈ √max_cells) so each tile becomes its
+    own candidate site of at most ``max_area_km2``. Total area is preserved; the
+    min-area filter still drops slivers downstream. ``None`` disables splitting
+    (backward-compatible default).
+    """
+    if max_area_km2 is None or cell_area_km2 <= 0:
+        return labeled_arr, num_features
+    max_cells = max(1, int(max_area_km2 / cell_area_km2))
+    side = max(1, round(math.sqrt(max_cells)))
+
+    out = np.zeros_like(labeled_arr)
+    next_label = 0
+    for lab in range(1, num_features + 1):
+        rows, cols = np.where(labeled_arr == lab)
+        if rows.size == 0:
+            continue
+        if rows.size <= max_cells:
+            next_label += 1
+            out[rows, cols] = next_label
+            continue
+        # Grid-partition the region's cells into ~max_cells tiles.
+        rmin, cmin = rows.min(), cols.min()
+        tiles_per_row = (cols.max() - cmin) // side + 1
+        tile_r = (rows - rmin) // side
+        tile_c = (cols - cmin) // side
+        tile_id = tile_r * tiles_per_row + tile_c
+        for tid in np.unique(tile_id):
+            sel = tile_id == tid
+            next_label += 1
+            out[rows[sel], cols[sel]] = next_label
+    return out, next_label
+
+
 def extract_sites(
     lsi: xr.DataArray,
     class_raster: xr.DataArray,
     *,
     top_classes: Sequence[int] = (5,),
     min_area_km2: float = 0.5,
+    max_site_area_km2: float | None = None,
     distance_to_ptl: xr.DataArray | None = None,
     top_k: int = 10,
     simplify_tolerance_m: float = 0.0,
@@ -179,6 +225,11 @@ def extract_sites(
         Minimum area threshold in km2.  Regions smaller than this are
         discarded.  Default ``0.5`` km2 (approx. minimum viable utility-scale
         PV footprint).
+    max_site_area_km2:
+        Maximum area for a single candidate site in km2.  A connected component
+        larger than this is subdivided into a grid of realistically-sized
+        sub-sites (A2 fix) so that an entire high-LSI region is never presented
+        as one decision.  ``None`` (default) disables subdivision.
     distance_to_ptl:
         Optional DataArray of distances (metres) to the nearest
         power-transmission line.  When provided, ``mean_ptl_dist`` is
@@ -243,6 +294,12 @@ def extract_sites(
     labeled_arr: np.ndarray = _label_out[0]
     num_features: int = int(_label_out[1])
     # labeled_arr: int array, 0 = background, 1..num_features = regions
+
+    # A2: subdivide oversized regions so a whole high-LSI area is not presented
+    # as one "site". Preserves total area; no-op when max_site_area_km2 is None.
+    labeled_arr, num_features = _split_large_regions(
+        labeled_arr, num_features, cell_area_km2_val, max_site_area_km2
+    )
 
     # ------------------------------------------------------------------
     # 3. Helper: empty GeoDataFrame with correct schema
