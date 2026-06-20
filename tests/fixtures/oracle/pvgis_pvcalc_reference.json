@@ -1,0 +1,23 @@
+{
+  "_provenance": {
+    "description": "Independent reference specific yields (E_y) from the PVGIS PVcalc oracle for known sites. Used as Track F reference-case regression + a sanity-envelope calibration check. These are real, fetched values — not invented.",
+    "source": "PVGIS (EU JRC) PVcalc endpoint",
+    "endpoint": "https://re.jrc.ec.europa.eu/api/v5_2/PVcalc",
+    "api_version": "v5_2",
+    "fetched_as_of": "2026-06-20",
+    "fixed_params": {
+      "peakpower_kwp": 1,
+      "loss_pct": 14,
+      "mountingplace": "free",
+      "angle_deg": "abs(latitude)",
+      "aspect_convention": "PVGIS: 0=equator-facing south (N hemisphere), 180=equator-facing north (S hemisphere)"
+    },
+    "note": "E_y is annual AC energy per installed kWp (kWh/kWp/yr) under PVGIS' own 14% loss assumption. Cape Town uses aspect=180 (north) because it is in the SOUTHERN hemisphere — directly corroborating the E1 equator-facing fix."
+  },
+  "sites": [
+    {"name": "aswan_eg", "lat": 24.09, "lon": 32.90, "hemisphere": "N", "aspect_pvgis": 0, "E_y_kwh_per_kwp_yr": 1960.9},
+    {"name": "nw_egypt_coast", "lat": 31.1, "lon": 27.5, "hemisphere": "N", "aspect_pvgis": 0, "E_y_kwh_per_kwp_yr": 1862.5},
+    {"name": "germany_munich", "lat": 48.14, "lon": 11.58, "hemisphere": "N", "aspect_pvgis": 0, "E_y_kwh_per_kwp_yr": 1108.8},
+    {"name": "cape_town_za", "lat": -33.93, "lon": 18.42, "hemisphere": "S", "aspect_pvgis": 180, "E_y_kwh_per_kwp_yr": 1684.1}
+  ]
+}
