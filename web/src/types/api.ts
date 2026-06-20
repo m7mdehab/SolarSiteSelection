@@ -113,3 +113,59 @@ export interface SiteFeature extends GeoJSON.Feature {
 export interface SitesGeoJSON extends GeoJSON.FeatureCollection {
   features: SiteFeature[];
 }
+
+// ---- Consumer rooftop mode -------------------------------------------------
+
+export interface RooftopRequest {
+  roof: {
+    area_m2: number;
+    usable_fraction?: number;
+    module_efficiency?: number;
+  };
+  latitude?: number;
+  longitude?: number;
+  specific_yield_kwh_kwp_yr?: number;
+  consumption?: {
+    annual_kwh?: number | null;
+    self_consumption_fraction?: number | null;
+  };
+  economics?: {
+    install_cost_usd_per_w?: number | null;
+    retail_tariff_usd_per_kwh?: number | null;
+    export_rate_usd_per_kwh?: number | null;
+    incentive_usd?: number | null;
+    om_cost_usd_per_kw_yr?: number | null;
+  };
+}
+
+export interface RooftopResult {
+  energy: {
+    capacity_kwp: number;
+    specific_yield_kwh_kwp_yr: number;
+    annual_production_kwh: number;
+    self_consumed_kwh: number;
+    exported_kwh: number;
+    grid_import_kwh: number;
+    self_consumption_ratio: number;
+    self_sufficiency: number;
+    dispatch_policy: string;
+  };
+  economics: {
+    install_cost_usd: number | null;
+    net_install_cost_usd: number | null;
+    annual_savings_usd: number | null;
+    simple_payback_years: number | null;
+    npv_usd: number | null;
+    lifetime_savings_usd: number | null;
+    unverified_inputs: string[];
+    caveats: string[];
+  };
+  sanity_ok: boolean;
+  sanity_messages: string[];
+  assumptions: string[];
+  monthly_kwh: number[] | null;
+  production_method: string | null;
+  production_note: string | null;
+  payback_band: { low: number; base: number; high: number; basis: string } | null;
+  unverified_panel: string[];
+}

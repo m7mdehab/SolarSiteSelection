@@ -49,6 +49,7 @@ from solarsite.api.schemas import (
     ReclassOut,
 )
 from solarsite.consumer import RECOMMENDED_RANGES, ConsumerResult, analyze_rooftop
+from solarsite.consumer.production import location_production
 from solarsite.consumer.schemas import RooftopAnalysisRequest
 from solarsite.core import AOI, AOIInvalidGeometryError, AOITooLargeError
 
@@ -442,17 +443,48 @@ def get_report(job_id: str) -> Response:
 def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
     """Analyse a household rooftop PV system (separate from the utility engine).
 
-    Capacity derives from the roof area, so this can NEVER produce a utility-scale
-    figure. Energy outputs are real; monetary outputs are ``null`` whenever their
-    region-specific input is an unverified ``NEEDS_HUMAN_DECISION`` stub, with the
-    missing inputs named in ``economics.unverified_inputs`` and ``caveats``. The
-    physical-sanity gate result is in ``sanity_ok`` / ``sanity_messages``.
+    Supply ``latitude``+``longitude`` for a VALIDATION-GRADE production figure
+    (pvlib ModelChain on the PVGIS TMY for that point, with a monthly profile), or
+    a caller ``specific_yield_kwh_kwp_yr`` directly. Capacity derives from the roof
+    area, so this can NEVER produce a utility-scale figure. Monetary outputs are
+    ``null`` whenever their region-specific input is an unverified
+    ``NEEDS_HUMAN_DECISION`` stub (named in ``economics.unverified_inputs`` and the
+    ``unverified_panel``). The physical-sanity verdict is in ``sanity_ok``.
     """
+    monthly_per_kwp: list[float] | None = None
+    method = "caller_supplied"
+    sy = body.specific_yield_kwh_kwp_yr
+
+    if body.latitude is not None and body.longitude is not None:
+        try:
+            prod = location_production(body.latitude, body.longitude)
+            sy = prod.specific_yield_kwh_kwp_yr
+            monthly_per_kwp = prod.monthly_kwh_per_kwp
+            method = "pvlib_modelchain"
+        except Exception as exc:  # PVGIS/network failure — never fabricate a yield
+            if sy is None:
+                raise HTTPException(
+                    status_code=502,
+                    detail=(
+                        "Could not compute validation-grade production for this location "
+                        f"(PVGIS unavailable: {exc}). Provide specific_yield_kwh_kwp_yr "
+                        "directly or retry."
+                    ),
+                ) from exc
+
+    if sy is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Provide either latitude+longitude or specific_yield_kwh_kwp_yr.",
+        )
+
     return analyze_rooftop(
         roof=body.roof,
-        specific_yield_kwh_kwp_yr=body.specific_yield_kwh_kwp_yr,
+        specific_yield_kwh_kwp_yr=sy,
         consumption=body.consumption,
         econ=body.economics,
+        monthly_kwh_per_kwp=monthly_per_kwp,
+        production_method=method,
     )
 
 

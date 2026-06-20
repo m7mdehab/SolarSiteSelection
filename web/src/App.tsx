@@ -10,6 +10,7 @@ import { LayerPanel } from './components/LayerPanel';
 import { RankingTable } from './components/RankingTable';
 import { DownloadButtons } from './components/DownloadButtons';
 import { SitePopup } from './components/SitePopup';
+import { ConsumerView } from './components/ConsumerView';
 import type { AppState } from './context/AppContext';
 import './styles/App.css';
 
@@ -93,6 +94,7 @@ export function App() {
   const mapRef = useRef<MapHandle>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [mode, setMode] = useState<'utility' | 'rooftop'>('utility');
 
   // Fetch criteria on mount
   useEffect(() => {
@@ -176,8 +178,27 @@ export function App() {
           <span className="app-header-title">Solar Site Selection</span>
           <span className="app-header-subtitle">Geospatial Analysis Tool</span>
         </div>
+        <div className="mode-toggle" role="tablist">
+          <button
+            className={mode === 'utility' ? 'mode-active' : ''}
+            onClick={() => setMode('utility')}
+            data-testid="mode-utility"
+          >
+            Utility siting
+          </button>
+          <button
+            className={mode === 'rooftop' ? 'mode-active' : ''}
+            onClick={() => setMode('rooftop')}
+            data-testid="mode-rooftop"
+          >
+            My rooftop
+          </button>
+        </div>
       </header>
 
+      {mode === 'rooftop' ? (
+        <ConsumerView />
+      ) : (
       <div className="app-body">
         {/* Left Sidebar */}
         <aside className="app-sidebar">
@@ -237,6 +258,7 @@ export function App() {
           </aside>
         )}
       </div>
+      )}
     </div>
   );
 }

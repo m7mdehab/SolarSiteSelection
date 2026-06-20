@@ -47,6 +47,7 @@ from __future__ import annotations
 import logging
 from typing import cast
 
+import numpy as np
 import pandas as pd
 import pvlib
 from pydantic import BaseModel, Field
@@ -59,6 +60,7 @@ __all__ = [
     "site_energy",
     "site_energy_from_ghi",
     "specific_yield",
+    "specific_yield_with_profile",
 ]
 
 log = logging.getLogger(__name__)
@@ -328,6 +330,50 @@ def specific_yield(
         annual_kwh_per_kwp,
     )
     return annual_kwh_per_kwp
+
+
+def specific_yield_with_profile(
+    lat: float,
+    lon: float,
+    tmy_df: pd.DataFrame,
+    assumptions: EnergyAssumptions,
+) -> tuple[float, list[float]]:
+    """Annual specific yield AND its 12-month profile (kWh/kWp), validation-grade.
+
+    Same pvlib ModelChain + itemized-loss path as :func:`specific_yield`, but also
+    returns the per-calendar-month energy (Jan..Dec) so a consumer breakdown can
+    show seasonality. The 12 monthly values sum to the annual figure. Feeds the
+    monthly production chart (Track A / Step 3.1).
+    """
+    tilt = assumptions.effective_tilt(lat)
+    azimuth = assumptions.effective_azimuth(lat)
+    loss_stack = assumptions.loss_stack
+
+    weather = _prepare_weather(tmy_df)
+    location = pvlib.location.Location(latitude=lat, longitude=lon)
+    system = _build_system(
+        tilt=tilt,
+        azimuth=azimuth,
+        inverter_nominal_efficiency=loss_stack.inverter_nominal_efficiency,
+    )
+    mc = pvlib.modelchain.ModelChain(
+        system, location, aoi_model="physical", spectral_model="no_loss"
+    )
+    mc.run_model(weather)
+    ac_raw = mc.results.ac
+    if ac_raw is None:
+        raise RuntimeError("ModelChain produced no AC results; check weather inputs.")
+    ac_series: pd.Series = pd.Series(ac_raw).clip(lower=0.0)  # type: ignore[arg-type]
+
+    derate = loss_stack.dc_derate
+    annual = float(ac_series.sum()) / 1000.0 * derate
+
+    # Group hourly Wh by calendar month -> kWh/kWp, applying the DC derate.
+    idx = pd.DatetimeIndex(ac_series.index)
+    months = np.array([ts.month for ts in idx], dtype=int)
+    wh = ac_series.to_numpy(dtype=float)
+    monthly = [float(wh[months == m].sum()) / 1000.0 * derate for m in range(1, 13)]
+    return annual, monthly
 
 
 def site_energy(

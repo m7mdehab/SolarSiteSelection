@@ -7,6 +7,8 @@ import type {
   JobResponse,
   LayerBounds,
   SitesGeoJSON,
+  RooftopRequest,
+  RooftopResult,
 } from '../types/api';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
@@ -62,4 +64,16 @@ export function getReportPdfUrl(jobId: string): string {
 
 export function getSitesGeoJsonUrl(jobId: string): string {
   return `${BASE_URL}/jobs/${jobId}/sites.geojson`;
+}
+
+export async function analyzeRooftop(data: RooftopRequest): Promise<RooftopResult> {
+  return request<RooftopResult>('/consumer/rooftop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getRecommendedRanges(): Promise<Record<string, Record<string, string>>> {
+  return request<Record<string, Record<string, string>>>('/consumer/recommended-ranges');
 }

@@ -222,3 +222,116 @@ def test_api_recommended_ranges_endpoint() -> None:
     body = resp.json()
     assert "install_cost_usd_per_w" in body
     assert body["install_cost_usd_per_w"]["source"]
+
+
+# ---------------------------------------------------------------------------
+# Validation-grade production + monthly profile + uncertainty band (Step 2/3.1)
+# ---------------------------------------------------------------------------
+
+
+def _diurnal_tmy() -> object:
+    import numpy as np
+    import pandas as pd
+
+    idx = pd.date_range("2005-01-01", periods=8760, freq="h", tz="UTC")
+    hour = np.array([ts.hour for ts in idx], dtype=float)
+    day = np.clip(np.sin((hour - 6.0) / 12.0 * np.pi), 0.0, None)
+    return pd.DataFrame(
+        {
+            "ghi": 900.0 * day,
+            "dni": 700.0 * day,
+            "dhi": 200.0 * day,
+            "temp_air": np.full(8760, 25.0),
+            "wind_speed": np.full(8760, 2.0),
+        },
+        index=idx,
+    )
+
+
+def test_specific_yield_with_profile_sums_to_annual() -> None:
+    from solarsite.analysis.energy import EnergyAssumptions, specific_yield_with_profile
+
+    annual, monthly = specific_yield_with_profile(31.2, 27.5, _diurnal_tmy(), EnergyAssumptions())
+    assert len(monthly) == 12
+    assert sum(monthly) == pytest.approx(annual, rel=1e-6)
+    assert annual > 0
+
+
+def test_location_production_with_injected_tmy() -> None:
+    from solarsite.consumer.production import location_production
+
+    prod = location_production(31.2, 27.5, tmy_df=_diurnal_tmy())
+    assert prod.method == "pvlib_modelchain"
+    assert len(prod.monthly_kwh_per_kwp) == 12
+    assert prod.specific_yield_kwh_kwp_yr > 0
+    assert prod.surface_azimuth == pytest.approx(180.0)  # northern hemisphere
+
+
+def test_analyze_rooftop_with_profile_and_band() -> None:
+    monthly_per_kwp = [100.0] * 12  # 1200 kWh/kWp/yr
+    res = analyze_rooftop(
+        RoofInput(area_m2=100.0),  # 15 kWp
+        specific_yield_kwh_kwp_yr=1200.0,
+        consumption=ConsumptionInput(annual_kwh=10000.0),
+        econ=EconomicInputs(install_cost_usd_per_w=3.0, retail_tariff_usd_per_kwh=0.20),
+        monthly_kwh_per_kwp=monthly_per_kwp,
+        production_method="pvlib_modelchain",
+    )
+    # Monthly system kWh = monthly/kWp * capacity (15 kWp).
+    assert res.monthly_kwh is not None and len(res.monthly_kwh) == 12
+    assert res.monthly_kwh[0] == pytest.approx(100.0 * 15.0, rel=1e-6)
+    assert res.production_method == "pvlib_modelchain"
+    assert "validation-grade" in (res.production_note or "")
+    # Payback band brackets the point payback.
+    assert res.payback_band is not None
+    pb = res.economics.simple_payback_years
+    assert res.payback_band.low <= pb <= res.payback_band.high
+    # The unverified panel lists the missing economic inputs (export/incentive/O&M).
+    assert any("export_rate_usd_per_kwh" in s for s in res.unverified_panel)
+
+
+def test_api_consumer_rooftop_validation_grade(monkeypatch: pytest.MonkeyPatch) -> None:
+    """POST with lat/lon computes a validation-grade result (PVGIS mocked offline)."""
+    from fastapi.testclient import TestClient
+
+    import solarsite.api.app as appmod
+    from solarsite.consumer.production import LocationProduction
+
+    def _fake_location_production(lat: float, lon: float) -> LocationProduction:
+        return LocationProduction(
+            latitude=lat,
+            longitude=lon,
+            specific_yield_kwh_kwp_yr=1800.0,
+            monthly_kwh_per_kwp=[150.0] * 12,
+            surface_tilt=abs(lat),
+            surface_azimuth=180.0,
+            method="pvlib_modelchain",
+        )
+
+    monkeypatch.setattr(appmod, "location_production", _fake_location_production)
+    client = TestClient(appmod.app)
+    resp = client.post(
+        "/consumer/rooftop",
+        json={
+            "roof": {"area_m2": 90.0},
+            "latitude": 31.2,
+            "longitude": 27.5,
+            "consumption": {"annual_kwh": 7000.0},
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["production_method"] == "pvlib_modelchain"
+    assert len(body["monthly_kwh"]) == 12
+    assert body["energy"]["specific_yield_kwh_kwp_yr"] == pytest.approx(1800.0)
+
+
+@pytest.mark.live
+def test_live_location_production_pvgis() -> None:
+    """Real PVGIS fetch for NW Egypt coast yields a plausible validation-grade number."""
+    from solarsite.consumer.production import location_production
+
+    prod = location_production(31.1, 27.5)
+    assert prod.method == "pvlib_modelchain"
+    assert 1400.0 <= prod.specific_yield_kwh_kwp_yr <= 2200.0
+    assert sum(prod.monthly_kwh_per_kwp) == pytest.approx(prod.specific_yield_kwh_kwp_yr, rel=1e-3)

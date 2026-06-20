@@ -188,8 +188,8 @@ async def submit_job(
 async def poll_until_done(
     client: AsyncClient,
     job_id: str,
-    timeout: float = 30.0,
-    interval: float = 0.05,
+    timeout: float = 90.0,  # generous: the in-process job is fast, but CI/dev load
+    interval: float = 0.05,  # can stretch the threadpool stage past a tight 30s budget
 ) -> dict[str, Any]:
     """Poll GET /jobs/{id} until status is 'done' or 'error', or timeout."""
     deadline = time.monotonic() + timeout

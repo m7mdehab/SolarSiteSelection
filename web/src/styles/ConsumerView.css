@@ -1,0 +1,257 @@
+.consumer-view {
+  padding: 16px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.consumer-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 16px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+@media (max-width: 760px) {
+  .consumer-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.consumer-card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e2e5ea);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.consumer-card h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.cv-econ-head {
+  margin-top: 18px !important;
+  border-top: 1px solid var(--color-border, #e2e5ea);
+  padding-top: 12px;
+}
+
+.cv-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+  margin: 8px 0 2px;
+}
+
+.cv-hint {
+  font-size: 11px;
+  color: var(--color-text-muted, #889);
+  margin: 4px 0;
+}
+
+.consumer-card input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.cv-row {
+  display: flex;
+  gap: 8px;
+}
+
+.cv-row > * {
+  flex: 1;
+}
+
+.cv-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.cv-preset-btn {
+  font-size: 11px;
+  padding: 3px 7px;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 12px;
+  background: #f4f6f9;
+  cursor: pointer;
+}
+
+.cv-estimate-btn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 9px;
+  background: var(--color-accent, #2f6df0);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.cv-estimate-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.cv-error {
+  margin-top: 10px;
+  color: #b3261e;
+  font-size: 12px;
+}
+
+.cv-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.cv-metric {
+  display: flex;
+  flex-direction: column;
+  background: #f6f8fb;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.cv-metric-label {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+}
+
+.cv-metric-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.cv-method {
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #fff4e5;
+  color: #8a5a00;
+  margin-bottom: 6px;
+}
+
+.cv-method-ok {
+  background: #e7f6ec;
+  color: #1d6b39;
+}
+
+.cv-note {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+  margin: 4px 0 10px;
+}
+
+.cv-sub {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+.cv-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 72px;
+}
+
+.cv-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.cv-bar {
+  width: 100%;
+  background: var(--color-accent, #2f6df0);
+  border-radius: 2px 2px 0 0;
+  min-height: 2px;
+}
+
+.cv-bar-label {
+  font-size: 9px;
+  color: var(--color-text-muted, #889);
+}
+
+.cv-econ-table {
+  width: 100%;
+  font-size: 13px;
+  border-collapse: collapse;
+}
+
+.cv-econ-table td {
+  padding: 4px 0;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.cv-econ-table td:last-child {
+  text-align: right;
+  font-weight: 600;
+}
+
+.cv-band {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+  margin: 6px 0 0;
+}
+
+.cv-band-basis {
+  font-style: italic;
+}
+
+.cv-unverified {
+  margin-top: 12px;
+  background: #fff4e5;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.cv-unverified ul,
+.cv-assumptions ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 11px;
+}
+
+.cv-assumptions {
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.cv-assumptions summary {
+  cursor: pointer;
+  color: var(--color-text-muted, #667);
+}
+
+/* Mode toggle in the header */
+.mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 16px;
+}
+
+.mode-toggle button {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border, #cdd2da);
+  background: #f4f6f9;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.mode-toggle button.mode-active {
+  background: var(--color-accent, #2f6df0);
+  color: #fff;
+  border-color: var(--color-accent, #2f6df0);
+}

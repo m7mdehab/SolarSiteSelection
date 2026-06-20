@@ -15,7 +15,9 @@ from solarsite.consumer.schemas import (
     EconomicsResult,
     EnergyBalance,
     RoofInput,
+    UncertaintyBand,
 )
+from solarsite.uncertainty import propagate
 from solarsite.validation import check, check_energy_result, check_roof_capacity
 
 __all__ = [
@@ -159,14 +161,18 @@ def analyze_rooftop(
     specific_yield_kwh_kwp_yr: float,
     consumption: ConsumptionInput | None = None,
     econ: EconomicInputs | None = None,
+    *,
+    monthly_kwh_per_kwp: list[float] | None = None,
+    production_method: str = "caller_supplied",
 ) -> ConsumerResult:
     """End-to-end consumer-mode analysis: roof → capacity → energy → economics.
 
     ``specific_yield_kwh_kwp_yr`` comes from the SAME validated energy engine the
     utility mode uses (pvlib ModelChain, or the labelled offline estimate) — this
     module does not re-derive PV physics. Returns a :class:`ConsumerResult` with
-    real energy figures, possibly-stubbed economics, an assumptions ledger, and
-    the physical-sanity verdict.
+    real energy figures, possibly-stubbed economics, an assumptions ledger, the
+    physical-sanity verdict, an optional monthly profile, a payback uncertainty
+    band, and a "what we can't verify" panel.
     """
     consumption = consumption or ConsumptionInput()
     econ = econ or EconomicInputs()
@@ -201,10 +207,61 @@ def analyze_rooftop(
             + ", ".join(economics.unverified_inputs)
         )
 
+    # ---- monthly system profile (kWh) ----------------------------------------
+    monthly_kwh: list[float] | None = None
+    if monthly_kwh_per_kwp is not None:
+        monthly_kwh = [round(m * capacity, 1) for m in monthly_kwh_per_kwp]
+
+    # ---- production uncertainty note -----------------------------------------
+    if production_method == "pvlib_modelchain":
+        production_note = (
+            "Production is validation-grade (pvlib ModelChain on the PVGIS TMY for "
+            "your location; agrees with the PVGIS oracle to within ~2-4%). It does "
+            "NOT yet include year-to-year (interannual) variability (~+/-5-10%), so "
+            "treat it as a typical-year P50 estimate."
+        )
+    else:
+        production_note = (
+            "Production uses a caller-supplied specific yield; for a validation-grade "
+            "figure provide a location (latitude/longitude)."
+        )
+
+    # ---- payback uncertainty band (Track C) ----------------------------------
+    payback_band: UncertaintyBand | None = None
+    net = economics.net_install_cost_usd
+    savings = economics.annual_savings_usd
+    if economics.simple_payback_years is not None and net is not None and savings and savings > 0:
+        # Propagate the production model spread (+/-4%, the measured oracle bound)
+        # through savings -> payback. Lower production -> lower savings -> longer payback.
+        band = propagate(
+            lambda annual_savings: net / annual_savings,
+            {"annual_savings": (savings * 0.96, savings, savings * 1.04)},
+        )
+        payback_band = UncertaintyBand(
+            low=round(band.low, 2),
+            base=round(band.base, 2),
+            high=round(band.high, 2),
+            basis=(
+                "production model spread (+/-4% vs PVGIS oracle); excludes interannual "
+                "variability and economic-input (cost/tariff) uncertainty"
+            ),
+        )
+
+    # ---- "what we can't verify for your area" panel --------------------------
+    panel = [
+        f"{name}: not verified for your area (enter your own value)"
+        for name in economics.unverified_inputs
+    ]
+
     return ConsumerResult(
         energy=balance,
         economics=economics,
         sanity_ok=sanity_ok,
         sanity_messages=sanity_messages,
         assumptions=ledger,
+        monthly_kwh=monthly_kwh,
+        production_method=production_method,
+        production_note=production_note,
+        payback_band=payback_band,
+        unverified_panel=panel,
     )

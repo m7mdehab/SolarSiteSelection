@@ -12,6 +12,7 @@ are ranges to inform a human decision — the engine does NOT use them as values
 
 from __future__ import annotations
 
+from solarsite.consumer.production import LocationProduction, location_production
 from solarsite.consumer.rooftop import (
     analyze_rooftop,
     annual_production_kwh,
@@ -27,6 +28,7 @@ from solarsite.consumer.schemas import (
     EnergyBalance,
     RoofInput,
     RooftopAnalysisRequest,
+    UncertaintyBand,
 )
 
 __all__ = [
@@ -36,12 +38,15 @@ __all__ = [
     "EconomicInputs",
     "EconomicsResult",
     "EnergyBalance",
+    "LocationProduction",
     "RoofInput",
     "RooftopAnalysisRequest",
+    "UncertaintyBand",
     "analyze_rooftop",
     "annual_production_kwh",
     "compute_economics",
     "energy_balance",
+    "location_production",
     "roof_capacity_kwp",
 ]
 

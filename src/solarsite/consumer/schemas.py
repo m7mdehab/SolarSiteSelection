@@ -29,6 +29,7 @@ __all__ = [
     "EnergyBalance",
     "RoofInput",
     "RooftopAnalysisRequest",
+    "UncertaintyBand",
 ]
 
 
@@ -136,6 +137,15 @@ class EconomicsResult(BaseModel):
     caveats: list[str] = Field(default_factory=list)
 
 
+class UncertaintyBand(BaseModel):
+    """low / base / high band for one figure, with what drives it."""
+
+    low: float
+    base: float
+    high: float
+    basis: str = Field(..., description="What the band reflects (e.g. production model spread).")
+
+
 class ConsumerResult(BaseModel):
     """Full consumer-mode result: real energy + (possibly stubbed) economics."""
 
@@ -146,19 +156,38 @@ class ConsumerResult(BaseModel):
     assumptions: list[str] = Field(
         default_factory=list, description="Human-readable ledger of every assumption used."
     )
+    # Validation-grade monthly production profile (when computed from a location).
+    monthly_kwh: list[float] | None = Field(
+        default=None, description="12 monthly production values (kWh) for the system; Jan..Dec."
+    )
+    production_method: str | None = Field(
+        default=None, description="'pvlib_modelchain' (validation-grade) or 'caller_supplied'."
+    )
+    production_note: str | None = Field(
+        default=None, description="Honest caveat about the production figure's uncertainty."
+    )
+    payback_band: UncertaintyBand | None = Field(
+        default=None, description="Uncertainty band on simple payback, when computable."
+    )
+    unverified_panel: list[str] = Field(
+        default_factory=list,
+        description="'What we can't verify for your area' — every unsourced/missing input.",
+    )
 
 
 class RooftopAnalysisRequest(BaseModel):
     """Request body for POST /consumer/rooftop.
 
-    ``specific_yield_kwh_kwp_yr`` is supplied by the caller (sourced from the PV
-    energy engine for the roof's location) — the consumer mode reuses that
-    validated yield rather than re-deriving PV physics.
+    Supply EITHER ``specific_yield_kwh_kwp_yr`` directly, OR ``latitude`` +
+    ``longitude`` so the server computes a validation-grade yield (pvlib ModelChain
+    on the PVGIS TMY for that point). Lat/lon takes precedence when both are given.
     """
 
     roof: RoofInput
-    specific_yield_kwh_kwp_yr: float = Field(
-        ..., gt=0.0, le=3000.0, description="Site specific yield (kWh/kWp/yr)."
+    specific_yield_kwh_kwp_yr: float | None = Field(
+        default=None, gt=0.0, le=3000.0, description="Caller-supplied specific yield (kWh/kWp/yr)."
     )
+    latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
+    longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
     consumption: ConsumptionInput | None = None
     economics: EconomicInputs | None = None
