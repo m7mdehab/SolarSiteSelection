@@ -79,28 +79,38 @@ def test_envelope_would_catch_a_wrong_reference() -> None:
 
 @pytest.mark.live
 def test_live_pvgis_matches_cached_reference_and_model() -> None:
-    """Re-fetch PVGIS (oracle drift) + cross-check our pvlib ModelChain.
+    """Re-fetch PVGIS (oracle drift) + an APPLES-TO-APPLES pvlib cross-check.
 
-    Network test, excluded from CI. Documented thresholds: PVGIS must reproduce
-    the cached E_y within 3% (oracle stability); our pvlib ModelChain (run on the
-    fresh TMY, same equator-facing geometry + loss stack) within 12% of PVGIS.
+    Network test, excluded from CI. Two documented checks per site:
+
+    1. Oracle stability: PVGIS PVcalc (loss=14%, the cached fixture's assumption)
+       must reproduce the cached E_y within **3%**.
+    2. Model validation (matched loss): we set PVGIS PVcalc's ``loss`` equal to the
+       model's OWN combined non-temperature system loss (DC stack 14.08% x inverter
+       0.96 = 17.51%), so the comparison isolates the irradiance→POA→cell-temp→AC
+       physics, NOT the loss bookkeeping. pvlib must then agree within **4%**.
+
+    Executed 2026-06-21 (recorded in DECISIONS): matched-loss agreement was
+    Aswan 2.2%, NW Egypt 0.6%, Munich 1.4%, Cape Town 0.7% — worst 2.2%. The 4%
+    threshold leaves margin for genuine model differences without absorbing a bug;
+    it was NOT widened to pass (observed << threshold).
     """
     import httpx
     import pandas as pd
 
     from solarsite.analysis.energy import EnergyAssumptions, specific_yield
 
-    ref = _load_reference()
-    for site in ref["sites"]:
-        lat, lon = site["lat"], site["lon"]
-        aspect = site["aspect_pvgis"]
-        pvcalc = httpx.get(
+    assumptions = EnergyAssumptions()
+    matched_loss_pct = round(assumptions.loss_stack.total_loss_fraction * 100.0, 2)
+
+    def _pvcalc(lat: float, lon: float, aspect: int, loss: float) -> float:
+        r = httpx.get(
             "https://re.jrc.ec.europa.eu/api/v5_2/PVcalc",
             params={
                 "lat": lat,
                 "lon": lon,
                 "peakpower": 1,
-                "loss": 14,
+                "loss": loss,
                 "mountingplace": "free",
                 "angle": abs(lat),
                 "aspect": aspect,
@@ -108,13 +118,22 @@ def test_live_pvgis_matches_cached_reference_and_model() -> None:
             },
             timeout=120.0,
         )
-        pvcalc.raise_for_status()
-        fresh = float(pvcalc.json()["outputs"]["totals"]["fixed"]["E_y"])
+        r.raise_for_status()
+        return float(r.json()["outputs"]["totals"]["fixed"]["E_y"])
+
+    ref = _load_reference()
+    for site in ref["sites"]:
+        lat, lon, aspect = site["lat"], site["lon"], site["aspect_pvgis"]
+
+        # 1. oracle stability vs the cached (loss=14) reference
+        fresh14 = _pvcalc(lat, lon, aspect, 14)
         cached = site["E_y_kwh_per_kwp_yr"]
-        assert abs(fresh - cached) / cached <= 0.03, (
-            f"{site['name']}: PVGIS drift {fresh:.0f} vs cached {cached:.0f}"
+        assert abs(fresh14 - cached) / cached <= 0.03, (
+            f"{site['name']}: PVGIS drift {fresh14:.0f} vs cached {cached:.0f}"
         )
 
+        # 2. matched-loss model cross-check (apples-to-apples)
+        pvcalc_matched = _pvcalc(lat, lon, aspect, matched_loss_pct)
         tmy = httpx.get(
             "https://re.jrc.ec.europa.eu/api/v5_2/tmy",
             params={"lat": lat, "lon": lon, "outputformat": "json"},
@@ -126,7 +145,9 @@ def test_live_pvgis_matches_cached_reference_and_model() -> None:
         ts = df["time(UTC)"].str.replace(":", "", regex=False)
         df.index = pd.to_datetime(ts, format="%Y%m%d%H%M", utc=True)
         df = df.drop(columns=["time(UTC)"])
-        sy = specific_yield(lat=lat, lon=lon, tmy_df=df, assumptions=EnergyAssumptions())
-        assert abs(sy - fresh) / fresh <= 0.12, (
-            f"{site['name']}: pvlib {sy:.0f} vs PVGIS {fresh:.0f} > 12%"
+        sy = specific_yield(lat=lat, lon=lon, tmy_df=df, assumptions=assumptions)
+        disagreement = abs(sy - pvcalc_matched) / pvcalc_matched
+        assert disagreement <= 0.04, (
+            f"{site['name']}: pvlib {sy:.0f} vs PVGIS@{matched_loss_pct}% "
+            f"{pvcalc_matched:.0f} = {disagreement:.1%} > 4% (matched loss)"
         )

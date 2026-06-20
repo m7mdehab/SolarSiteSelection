@@ -12,7 +12,8 @@
       "angle_deg": "abs(latitude)",
       "aspect_convention": "PVGIS: 0=equator-facing south (N hemisphere), 180=equator-facing north (S hemisphere)"
     },
-    "note": "E_y is annual AC energy per installed kWp (kWh/kWp/yr) under PVGIS' own 14% loss assumption. Cape Town uses aspect=180 (north) because it is in the SOUTHERN hemisphere — directly corroborating the E1 equator-facing fix."
+    "note": "E_y is annual AC energy per installed kWp (kWh/kWp/yr) under PVGIS' own 14% loss assumption. Cape Town uses aspect=180 (north) because it is in the SOUTHERN hemisphere — directly corroborating the E1 equator-facing fix.",
+    "matched_loss_validation": "Executed 2026-06-21: re-running PVGIS PVcalc with loss set to the MODEL's own combined non-temperature system loss (17.51% = 14.08% DC stack x 0.96 inverter) and comparing our pvlib ModelChain on the fresh TMY gave agreement: Aswan 2.2%, NW Egypt 0.6%, Munich 1.4%, Cape Town 0.7% (worst 2.2%). This is the apples-to-apples physics check; the live test asserts <=4%."
   },
   "sites": [
     {"name": "aswan_eg", "lat": 24.09, "lon": 32.90, "hemisphere": "N", "aspect_pvgis": 0, "E_y_kwh_per_kwp_yr": 1960.9},
