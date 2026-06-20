@@ -88,17 +88,22 @@ def test_specific_yield_fixture() -> None:
     but we call with lat=35, lon=-6 (NW Morocco coast) which is a similar
     irradiance regime.  The tiled fixture represents average January
     conditions repeated year-round, which slightly underestimates the true
-    annual yield but should still be well within the 1400-2400 kWh/kWp/yr
-    window for the broader NW-Africa / southern Mediterranean region.
+    annual yield.
+
+    Range note (E2): with the itemized loss stack now applied (~17.5 % combined
+    vs the old 4 %), the same fixture yields ~1380 kWh/kWp/yr (was ~1608 under
+    the under-counted losses). The 1250-2200 window is the physically plausible
+    band for the broader NW-Africa / southern Mediterranean region *with
+    realistic losses*.
     """
     tmy_df = _load_tmy_fixture_df()
     assumptions = EnergyAssumptions()
 
     result = specific_yield(lat=35.0, lon=-6.0, tmy_df=tmy_df, assumptions=assumptions)
 
-    # Sanity-check: plausible range for this region (using tiled winter data)
-    assert 1400.0 <= result <= 2400.0, (
-        f"specific_yield={result:.1f} kWh/kWp/yr is outside expected range 1400-2400"
+    # Sanity-check: plausible range for this region (tiled winter data, full E2 losses)
+    assert 1250.0 <= result <= 2200.0, (
+        f"specific_yield={result:.1f} kWh/kWp/yr is outside expected range 1250-2200"
     )
 
 
@@ -195,13 +200,68 @@ def test_energy_assumptions_defaults() -> None:
     """EnergyAssumptions should have the documented defaults."""
     a = EnergyAssumptions()
     assert a.tilt is None
-    assert a.azimuth == pytest.approx(180.0)
+    # E1: azimuth default is None == "auto, equator-facing" (was a hard-coded 180).
+    assert a.azimuth is None
     assert a.dc_ac_ratio == pytest.approx(1.0)
     assert a.packing_density_mwp_per_km2 == pytest.approx(45.0)
     assert a.capex_per_kwp == pytest.approx(1000.0)
     assert a.opex_per_kwp_yr == pytest.approx(17.0)
     assert a.discount_rate == pytest.approx(0.07)
     assert a.lifetime_yr == 25
+
+
+# ---------------------------------------------------------------------------
+# E1: equator-facing azimuth + sign-correct tilt (northern / equator / southern)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("lat", "expected_az"),
+    [
+        (35.0, 180.0),  # northern hemisphere -> due south
+        (0.0, 180.0),  # equator -> south by convention (tilt ~0 makes it moot)
+        (-33.9, 0.0),  # southern hemisphere (Cape Town) -> due north
+        (-1.3, 0.0),  # just south of equator -> due north
+    ],
+)
+def test_effective_azimuth_equator_facing(lat: float, expected_az: float) -> None:
+    """Default azimuth resolves equator-facing in BOTH hemispheres (E1)."""
+    a = EnergyAssumptions()  # azimuth=None -> auto
+    assert a.effective_azimuth(lat) == pytest.approx(expected_az)
+
+
+def test_effective_azimuth_explicit_override_wins() -> None:
+    """An explicit azimuth overrides the equator-facing default."""
+    a = EnergyAssumptions(azimuth=200.0)
+    assert a.effective_azimuth(-33.9) == pytest.approx(200.0)
+    assert a.effective_azimuth(35.0) == pytest.approx(200.0)
+
+
+@pytest.mark.parametrize("lat", [35.0, 0.0, -33.9])
+def test_effective_tilt_is_abs_latitude(lat: float) -> None:
+    """Default tilt is |latitude| — a positive angle in both hemispheres (E1)."""
+    a = EnergyAssumptions()
+    assert a.effective_tilt(lat) == pytest.approx(abs(lat))
+    assert a.effective_tilt(lat) >= 0.0
+
+
+def test_southern_hemisphere_yield_beats_north_facing() -> None:
+    """At a southern-hemisphere site, the equator-facing default (north, 0°)
+    must out-produce a wrongly south-facing (180°) array — proving the E1 fix
+    actually changes the physics, not just a label."""
+    tmy_df = _load_tmy_fixture_df()
+    lat, lon = -33.9, 18.4  # Cape Town
+
+    correct = EnergyAssumptions()  # auto -> north-facing (0°)
+    wrong = EnergyAssumptions(azimuth=180.0)  # the old hard-coded default
+
+    sy_correct = specific_yield(lat=lat, lon=lon, tmy_df=tmy_df, assumptions=correct)
+    sy_wrong = specific_yield(lat=lat, lon=lon, tmy_df=tmy_df, assumptions=wrong)
+
+    assert sy_correct > sy_wrong, (
+        f"equator-facing sy={sy_correct:.1f} should beat south-facing "
+        f"sy={sy_wrong:.1f} in the southern hemisphere"
+    )
 
 
 # ---------------------------------------------------------------------------

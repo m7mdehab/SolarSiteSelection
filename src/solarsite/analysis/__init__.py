@@ -14,6 +14,7 @@ from solarsite.analysis.energy import (
     site_energy_from_ghi,
     specific_yield,
 )
+from solarsite.analysis.losses import LossLineItem, LossStack
 from solarsite.analysis.overlay import (
     apply_exclusions,
     build_exclusion_mask,
@@ -32,6 +33,8 @@ __all__ = [
     "EnergyAssumptions",
     "EnergyResult",
     "InconsistencyError",
+    "LossLineItem",
+    "LossStack",
     "ahp_weights",
     "ahp_weights_strict",
     "apply_exclusions",

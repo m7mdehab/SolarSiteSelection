@@ -6,18 +6,23 @@ DataFrame fetched by :mod:`solarsite.acquire.pvgis`.
 
 Model choices
 -------------
-* **Mount**: Fixed-tilt at surface_tilt = site latitude (if not overridden),
-  surface_azimuth = 180° (due south, northern-hemisphere default).
+* **Mount**: Fixed-tilt at surface_tilt = |site latitude| (if not overridden);
+  surface_azimuth is **equator-facing** — 180° (due south) in the northern
+  hemisphere, 0° (due north) in the southern hemisphere (E1 fix; the old
+  hard-coded 180° made the "works anywhere" claim false south of the equator).
 * **Module**: 1 kWp reference normalised module -- ``pdc0=1000 W``,
   ``gamma_pdc=-0.004`` (%/°C).
-* **Inverter**: PVWatts-style single-parameter inverter with ``eta_inv_nom``
-  set to **0.96** (documents the 4 % DC-to-AC derate / system losses).
+* **Inverter**: PVWatts-style single-parameter inverter; nominal efficiency
+  comes from the loss stack (default 0.96).
+* **Losses (E2)**: an itemized :class:`~solarsite.analysis.losses.LossStack`
+  replaces the old single 0.96. The ten DC-side PVWatts components combine
+  multiplicatively to ~14.08 % and are applied as an explicit DC derate; the
+  inverter nominal efficiency (0.96) is applied separately inside pvlib. The
+  full breakdown is surfaced on :class:`EnergyResult` as ``loss_stack`` so the
+  derate is auditable line by line rather than a magic number.
 * **Temperature model**: SAPM open-rack glass-glass coefficients.
 * **AOI model**: ``'physical'`` (no extra reflection losses beyond Fresnel).
 * **Spectral model**: ``'no_loss'`` (spectral correction skipped for speed).
-
-The 0.96 ``eta_inv_nom`` is the single place that encodes "system losses"
-(inverter efficiency + DC wiring + mismatch + soiling margin).
 
 LCOE formula
 ------------
@@ -46,10 +51,13 @@ import pandas as pd
 import pvlib
 from pydantic import BaseModel, Field
 
+from solarsite.analysis.losses import LossStack
+
 __all__ = [
     "EnergyAssumptions",
     "EnergyResult",
     "site_energy",
+    "site_energy_from_ghi",
     "specific_yield",
 ]
 
@@ -75,13 +83,18 @@ class EnergyAssumptions(BaseModel):
     ----------
     tilt:
         Panel tilt angle in degrees from horizontal.  ``None`` (default) means
-        use the site latitude as the optimal fixed tilt.
+        use ``|latitude|`` as the optimal fixed tilt (sign-correct in both
+        hemispheres; tilt is always a positive angle from horizontal).
     azimuth:
-        Panel azimuth in degrees clockwise from North.  180° = due south,
-        which is optimal for the northern hemisphere.
+        Panel azimuth in degrees clockwise from North (0=N, 90=E, 180=S, 270=W).
+        ``None`` (default) means **auto, equator-facing**: 180° (due south) in
+        the northern hemisphere, 0° (due north) in the southern hemisphere.
+        Pass an explicit float to override. Resolve via :meth:`effective_azimuth`.
     dc_ac_ratio:
-        DC-to-AC ratio (inverter loading ratio).  Currently informational;
-        the 0.96 derate is applied via the inverter ``eta_inv_nom`` parameter.
+        DC-to-AC ratio (inverter loading ratio). Informational; the derate is
+        applied via the itemized :class:`~solarsite.analysis.losses.LossStack`.
+    loss_stack:
+        Itemized PV loss breakdown (E2). Replaces the old single 0.96 derate.
     packing_density_mwp_per_km2:
         Nameplate DC capacity per unit land area (MWp/km²).  Default 45 MWp/km²
         reflects ground-mounted utility-scale PV at ~20% land coverage with
@@ -96,11 +109,18 @@ class EnergyAssumptions(BaseModel):
         Project economic life in years.
     """
 
-    tilt: float | None = Field(default=None, description="Panel tilt (degrees); None -> latitude")
-    azimuth: float = Field(default=180.0, description="Panel azimuth (degrees, 180=due south)")
+    tilt: float | None = Field(default=None, description="Panel tilt (degrees); None -> |latitude|")
+    azimuth: float | None = Field(
+        default=None,
+        description="Panel azimuth (deg CW from N); None -> auto equator-facing (180 N / 0 S)",
+    )
     dc_ac_ratio: float = Field(
         default=1.0,
-        description="DC/AC ratio (informational; derate applied via eta_inv_nom=0.96)",
+        description="DC/AC ratio (informational; derate applied via loss_stack)",
+    )
+    loss_stack: LossStack = Field(
+        default_factory=LossStack,
+        description="Itemized PV loss components (E2); replaces the old single 0.96.",
     )
     packing_density_mwp_per_km2: float = Field(
         default=45.0,
@@ -110,6 +130,22 @@ class EnergyAssumptions(BaseModel):
     opex_per_kwp_yr: float = Field(default=17.0, description="Annual OPEX in USD/kWp/yr")
     discount_rate: float = Field(default=0.07, description="Real WACC (dimensionless)")
     lifetime_yr: int = Field(default=25, description="Project lifetime in years")
+
+    def effective_tilt(self, lat: float) -> float:
+        """Resolve tilt: explicit override, else ``|latitude|`` (both hemispheres)."""
+        return float(self.tilt) if self.tilt is not None else abs(float(lat))
+
+    def effective_azimuth(self, lat: float) -> float:
+        """Resolve azimuth: explicit override, else equator-facing.
+
+        Northern hemisphere (lat >= 0) faces due south (180°); southern
+        hemisphere faces due north (0°). This is the E1 fix that makes the
+        default physically correct anywhere on Earth, not just north of the
+        equator.
+        """
+        if self.azimuth is not None:
+            return float(self.azimuth)
+        return 180.0 if float(lat) >= 0.0 else 0.0
 
 
 class EnergyResult(BaseModel):
@@ -125,6 +161,16 @@ class EnergyResult(BaseModel):
         Annual AC electricity generation (GWh/yr).
     lcoe_usd_per_mwh:
         Levelised Cost of Energy (USD/MWh).
+    method:
+        Which model produced ``specific_yield_kwh_kwp_yr``:
+        ``"pvlib_modelchain"`` (validation-grade, the default for displayed
+        numbers) or ``"ghi_pr_offline"`` (the labelled GHI*PR offline fallback).
+    loss_stack:
+        The itemized loss breakdown applied (E2). ``None`` only for legacy
+        callers that did not supply one.
+    surface_tilt / surface_azimuth:
+        The resolved array geometry actually used (degrees). ``None`` for the
+        offline GHI*PR path, which does not model array orientation.
     assumptions:
         The :class:`EnergyAssumptions` used to produce this result.
     """
@@ -133,6 +179,10 @@ class EnergyResult(BaseModel):
     capacity_mwp: float
     annual_gwh: float
     lcoe_usd_per_mwh: float
+    method: str = "pvlib_modelchain"
+    loss_stack: LossStack | None = None
+    surface_tilt: float | None = None
+    surface_azimuth: float | None = None
     assumptions: EnergyAssumptions
 
 
@@ -174,14 +224,19 @@ def _prepare_weather(tmy_df: pd.DataFrame) -> pd.DataFrame:
 def _build_system(
     tilt: float,
     azimuth: float,
+    inverter_nominal_efficiency: float = 0.96,
 ) -> pvlib.pvsystem.PVSystem:
     """Build a 1 kWp reference PVSystem for the given tilt/azimuth.
 
     The system is normalised to 1 kWp (pdc0=1000 W) so that ``mc.results.ac``
     is directly in W per kWp, and the annual sum is kWh/kWp.
 
-    The inverter ``eta_inv_nom=0.96`` encodes a 4 % system-losses derate
-    (inverter efficiency + DC wiring + mismatch + soiling).
+    The inverter ``eta_inv_nom`` is the **nominal inverter efficiency only**
+    (default 0.96, PVWatts convention). The DC-side system losses (soiling,
+    mismatch, wiring, …) are NOT folded in here — they are applied explicitly
+    and transparently in :func:`specific_yield` from the itemized
+    :class:`~solarsite.analysis.losses.LossStack`, so this function no longer
+    double-counts losses inside one opaque number.
     """
     mount = pvlib.pvsystem.FixedMount(
         surface_tilt=tilt,
@@ -194,7 +249,7 @@ def _build_system(
     )
     system = pvlib.pvsystem.PVSystem(
         arrays=[array],
-        inverter_parameters={"pdc0": 1000.0, "eta_inv_nom": 0.96},
+        inverter_parameters={"pdc0": 1000.0, "eta_inv_nom": float(inverter_nominal_efficiency)},
     )
     return system
 
@@ -229,13 +284,18 @@ def specific_yield(
     float
         Annual AC energy per installed kWp in kWh/kWp/yr.
     """
-    tilt = assumptions.tilt if assumptions.tilt is not None else abs(lat)
-    azimuth = assumptions.azimuth
+    tilt = assumptions.effective_tilt(lat)
+    azimuth = assumptions.effective_azimuth(lat)
+    loss_stack = assumptions.loss_stack
 
     weather = _prepare_weather(tmy_df)
 
     location = pvlib.location.Location(latitude=lat, longitude=lon)
-    system = _build_system(tilt=tilt, azimuth=azimuth)
+    system = _build_system(
+        tilt=tilt,
+        azimuth=azimuth,
+        inverter_nominal_efficiency=loss_stack.inverter_nominal_efficiency,
+    )
 
     mc = pvlib.modelchain.ModelChain(
         system,
@@ -246,21 +306,25 @@ def specific_yield(
     mc.run_model(weather)
 
     # mc.results.ac is a Series of AC power in W (for a 1 kWp reference system)
-    # Summing hourly W values gives Wh; divide by 1000 to get kWh/kWp/yr.
+    # Summing hourly W values gives Wh; divide by 1000 to get kWh/kWp/yr. The
+    # inverter nominal efficiency is already applied inside the ModelChain; the
+    # DC-side system losses (~14% PVWatts) are applied here, explicitly, so the
+    # derate is the itemized loss stack rather than a hidden constant.
     ac_raw = mc.results.ac
     if ac_raw is None:
         raise RuntimeError("ModelChain produced no AC results; check weather inputs.")
     ac_series: pd.Series = pd.Series(ac_raw)  # type: ignore[arg-type]
     # Replace any negative values (pvlib can return small negatives at night)
     ac_series = ac_series.clip(lower=0.0)
-    annual_kwh_per_kwp = float(ac_series.sum()) / 1000.0
+    annual_kwh_per_kwp = float(ac_series.sum()) / 1000.0 * loss_stack.dc_derate
 
     log.debug(
-        "specific_yield(lat=%.3f, lon=%.3f, tilt=%.1f, az=%.1f) = %.1f kWh/kWp/yr",
+        "specific_yield(lat=%.3f, lon=%.3f, tilt=%.1f, az=%.1f, dc_derate=%.4f) = %.1f kWh/kWp/yr",
         lat,
         lon,
         tilt,
         azimuth,
+        loss_stack.dc_derate,
         annual_kwh_per_kwp,
     )
     return annual_kwh_per_kwp
@@ -338,6 +402,10 @@ def site_energy(
         capacity_mwp=capacity_mwp,
         annual_gwh=annual_gwh,
         lcoe_usd_per_mwh=lcoe_usd_per_mwh,
+        method="pvlib_modelchain",
+        loss_stack=assumptions.loss_stack,
+        surface_tilt=assumptions.effective_tilt(lat),
+        surface_azimuth=assumptions.effective_azimuth(lat),
         assumptions=assumptions,
     )
 
@@ -371,5 +439,9 @@ def site_energy_from_ghi(
         capacity_mwp=capacity_mwp,
         annual_gwh=annual_gwh,
         lcoe_usd_per_mwh=lcoe_usd_per_kwh * 1000.0,
+        method="ghi_pr_offline",
+        loss_stack=a.loss_stack,
+        surface_tilt=None,
+        surface_azimuth=None,
         assumptions=a,
     )

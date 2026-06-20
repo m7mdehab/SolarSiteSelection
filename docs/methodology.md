@@ -397,11 +397,22 @@ Energy estimation is in `src/solarsite/analysis/energy.py`, using
 **pvlib ModelChain** on a PVGIS Typical Meteorological Year (TMY) for the
 site centroid.
 
-**System model:** Fixed-tilt at latitude, due south (180° azimuth), 1 kWp
-reference DC module (`pdc0=1000 W`, `gamma_pdc=−0.004 %/°C`), SAPM
-open-rack glass-glass temperature model, physical AOI model, no spectral
-correction. System losses are encoded as `eta_inv_nom=0.96` (4% derate for
-inverter efficiency, DC wiring, mismatch, and soiling).
+**System model:** Fixed-tilt at `|latitude|`, **equator-facing** — 180°
+(due south) in the northern hemisphere, 0° (due north) in the southern
+hemisphere (E1; the old hard-coded 180° was wrong south of the equator). 1 kWp
+reference DC module (`pdc0=1000 W`, `gamma_pdc=−0.004 %/°C`), SAPM open-rack
+glass-glass temperature model, physical AOI model, no spectral correction.
+
+**System losses (E2):** an itemized loss stack
+(`src/solarsite/analysis/losses.py`) replaces the old single `eta_inv_nom=0.96`.
+The ten DC-side **PVWatts** components — soiling 2 %, shading 3 %, snow 0 %,
+mismatch 2 %, wiring 2 %, connections 0.5 %, LID 1.5 %, nameplate 1 %, age 0 %,
+availability 3 % — combine multiplicatively to **14.08 %** (verified to
+reproduce `pvlib.pvsystem.pvwatts_losses()` exactly; source: PVWatts V5 Manual,
+Dobos 2014, NREL/TP-6A20-62641). Inverter nominal efficiency (0.96) is modelled
+separately, for a combined end-to-end derate of ~17.5 %. The full breakdown is
+surfaced on every `EnergyResult` as `loss_stack`, so the derate is auditable
+line by line rather than a magic number.
 
 **LCOE formula** (NREL SAM convention):
 
