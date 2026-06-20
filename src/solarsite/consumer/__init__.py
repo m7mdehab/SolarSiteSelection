@@ -46,8 +46,8 @@ __all__ = [
 ]
 
 #: Published RANGES for the NEEDS_HUMAN_DECISION economic inputs. Ranges, not
-#: values — to inform a human, never consumed by the engine. Sources are real
-#: and verified (see `_pm/DECISIONS.md` verification rows + `_pm/MORNING_QUEUE.md`).
+#: values — to inform a human, never consumed by the engine. Each range cites a
+#: real, verified source inline.
 RECOMMENDED_RANGES: dict[str, dict[str, str]] = {
     "install_cost_usd_per_w": {
         "range": "3.2-5.5 USD/W (US residential, 20th-80th pct)",

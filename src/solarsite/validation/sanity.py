@@ -6,7 +6,7 @@ flagged (and, where a gate calls :func:`assert_within`, blocked) rather than
 displayed. These are *plausibility envelopes*, deliberately wide; they are NOT
 precise point estimates and must never be read as "the expected value."
 
-Provenance of the envelopes (recorded in `_pm/DECISIONS.md` as verification rows):
+Provenance of the envelopes (each verified against its cited source):
 
 * Specific yield — World Bank/ESMAP/Solargis *Global Photovoltaic Power Potential
   by Country* (2020): 93 % of population lives where daily PVOUT is 3.0-5.0

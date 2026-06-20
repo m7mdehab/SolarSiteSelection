@@ -429,10 +429,9 @@ def _resolve_tmy(aoi: AOI, layers: dict[str, xr.DataArray]) -> pd.DataFrame | No
     Current behaviour: returns ``None``. The offline preset ships no hourly TMY in
     its cache, and we do not fetch live PVGIS TMY on every request from inside the
     request path. Wiring a real TMY source — a PVGIS TMY baked into each preset's
-    cache, and/or a guarded live fetch for drawn AOIs — is tracked in
-    ``_pm/MORNING_QUEUE.md`` as the step that upgrades the *displayed* preset
-    numbers from "offline estimate" to validation-grade. The ModelChain code path
-    is implemented and tested; only this resolver is stubbed.
+    cache, and/or a guarded live fetch for drawn AOIs — is the step that upgrades
+    the *displayed* preset numbers from "offline estimate" to validation-grade. The
+    ModelChain code path is implemented and tested; only this resolver is stubbed.
     """
     _ = (aoi, layers)
     return None

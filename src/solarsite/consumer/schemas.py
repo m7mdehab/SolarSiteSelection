@@ -79,8 +79,8 @@ class ConsumptionInput(BaseModel):
 class EconomicInputs(BaseModel):
     """Economic inputs. Money-valued fields default to None = NEEDS_HUMAN_DECISION.
 
-    Recommended RANGES (not values) are documented in `_pm/MORNING_QUEUE.md` and
-    on :data:`solarsite.consumer.RECOMMENDED_RANGES`. We do not fill these in.
+    Recommended RANGES (not values) with sources are exposed on
+    :data:`solarsite.consumer.RECOMMENDED_RANGES`. We do not fill these in.
     """
 
     install_cost_usd_per_w: float | None = Field(

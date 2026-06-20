@@ -10,8 +10,8 @@ Offline tests (CI) assert the oracle values land inside our physical envelopes
 wrong number. The live test (network, excluded from CI) re-fetches PVGIS to detect
 oracle drift and cross-checks our pvlib ModelChain.
 
-The SECOND oracle (NREL PVWatts) is not yet wired — it needs an NREL API key this
-host lacks (flagged in `_pm/MORNING_QUEUE.md` C2); PVGIS is oracle #1.
+The SECOND oracle (NREL PVWatts) is not yet wired — it needs an NREL API key the
+build host lacks (a known follow-up); PVGIS is oracle #1.
 """
 
 from __future__ import annotations
