@@ -349,6 +349,57 @@ def test_live_location_production_pvgis() -> None:
     assert sum(prod.monthly_kwh_per_kwp) == pytest.approx(prod.specific_yield_kwh_kwp_yr, rel=1e-3)
 
 
+def test_irr_and_cashflow_computed() -> None:
+    """IRR + a full cashflow are produced from the user's own numbers (no defaults)."""
+    bal = energy_balance(10.0, 1500.0, ConsumptionInput(annual_kwh=15000.0))
+    econ = EconomicInputs(
+        install_cost_usd_per_w=3.0,
+        retail_tariff_usd_per_kwh=0.20,
+        analysis_years=25,
+        degradation_per_yr=0.0,
+    )
+    e = compute_economics(bal, econ)
+    # 30,000 cost, 3,000/yr for 25 yr -> IRR ~ 8.9% (positive, plausible).
+    assert e.irr_pct is not None
+    assert 5.0 < e.irr_pct < 12.0
+    assert len(e.cashflow) == 26  # year 0..25
+    assert e.cashflow[0].cumulative_usd == pytest.approx(-30000.0)
+    assert e.cashflow[-1].cumulative_usd == pytest.approx(-30000.0 + 25 * 3000.0)
+
+
+def test_irr_none_when_economics_unverified() -> None:
+    res = analyze_rooftop(RoofInput(area_m2=80.0), specific_yield_kwh_kwp_yr=1700.0)
+    assert res.economics.irr_pct is None
+    assert res.economics.cashflow == []
+
+
+def test_co2_none_without_factor() -> None:
+    """No grid factor supplied -> CO2 is not available, never fabricated."""
+    res = analyze_rooftop(
+        RoofInput(area_m2=100.0),
+        specific_yield_kwh_kwp_yr=1600.0,
+        consumption=ConsumptionInput(annual_kwh=8000.0),
+    )
+    assert res.co2 is not None
+    assert res.co2.annual_kg is None
+    assert "not available" in res.co2.note
+
+
+def test_co2_from_user_grid_factor() -> None:
+    res = analyze_rooftop(
+        RoofInput(area_m2=100.0),
+        specific_yield_kwh_kwp_yr=1600.0,
+        consumption=ConsumptionInput(annual_kwh=8000.0),
+        econ=EconomicInputs(grid_co2_g_per_kwh=400.0, analysis_years=25, degradation_per_yr=0.0),
+    )
+    assert res.co2 is not None and res.co2.annual_kg is not None
+    # 15 kWp * 1600 = 24,000 kWh generated; all displaces grid at 400 g/kWh.
+    expected_annual = 24000.0 * 400.0 / 1000.0  # kg
+    assert res.co2.annual_kg == pytest.approx(expected_annual, rel=1e-6)
+    assert res.co2.lifetime_kg == pytest.approx(expected_annual * 25, rel=1e-6)
+    assert "average" in res.co2.basis.lower()
+
+
 def test_orientation_penalty_for_bad_tilt() -> None:
     """A flat (tilt=0) roof in a sunny mid-latitude yields LESS than the optimum."""
     from solarsite.consumer.production import location_production

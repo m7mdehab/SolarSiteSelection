@@ -140,6 +140,7 @@ export interface RooftopRequest {
     export_rate_usd_per_kwh?: number | null;
     incentive_usd?: number | null;
     om_cost_usd_per_kw_yr?: number | null;
+    grid_co2_g_per_kwh?: number | null;
   };
 }
 
@@ -161,10 +162,19 @@ export interface RooftopResult {
     annual_savings_usd: number | null;
     simple_payback_years: number | null;
     npv_usd: number | null;
+    irr_pct: number | null;
     lifetime_savings_usd: number | null;
+    cashflow: { year: number; annual_cash_usd: number; cumulative_usd: number }[];
     unverified_inputs: string[];
     caveats: string[];
   };
+  co2: {
+    grid_factor_g_per_kwh: number | null;
+    annual_kg: number | null;
+    lifetime_kg: number | null;
+    basis: string;
+    note: string;
+  } | null;
   sanity_ok: boolean;
   sanity_messages: string[];
   assumptions: string[];

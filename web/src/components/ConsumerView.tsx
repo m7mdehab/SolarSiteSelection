@@ -56,6 +56,7 @@ export function ConsumerView() {
   const [tariff, setTariff] = useState('');
   const [exportRate, setExportRate] = useState('');
   const [incentive, setIncentive] = useState('');
+  const [gridCo2, setGridCo2] = useState('');
 
   const [result, setResult] = useState<RooftopResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -115,6 +116,7 @@ export function ConsumerView() {
         retail_tariff_usd_per_kwh: numOrUndef(tariff) ?? null,
         export_rate_usd_per_kwh: numOrUndef(exportRate) ?? null,
         incentive_usd: numOrUndef(incentive) ?? null,
+        grid_co2_g_per_kwh: numOrUndef(gridCo2) ?? null,
       };
       const req: RooftopRequest = {
         roof: {
@@ -392,6 +394,15 @@ export function ConsumerView() {
               <input value={incentive} onChange={(e) => setIncentive(e.target.value)} placeholder="0" />
             </div>
           </div>
+          <label className="cv-label" title="Your grid's carbon intensity — e.g. from Ember or your grid operator">
+            Grid CO₂ (gCO₂/kWh) — for climate impact
+          </label>
+          <input
+            data-testid="cv-grid-co2"
+            value={gridCo2}
+            onChange={(e) => setGridCo2(e.target.value)}
+            placeholder="blank = CO₂ not shown (no default invented)"
+          />
 
           <button
             className="cv-estimate-btn"
@@ -560,6 +571,18 @@ export function ConsumerView() {
                       <td>NPV</td>
                       <td>{money(result.economics.npv_usd)}</td>
                     </tr>
+                    <tr>
+                      <td>IRR</td>
+                      <td data-testid="cv-irr">
+                        {typeof result.economics.irr_pct === 'number'
+                          ? `${fmt(result.economics.irr_pct, 1)}%`
+                          : '— enter to see'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Lifetime savings</td>
+                      <td>{money(result.economics.lifetime_savings_usd)}</td>
+                    </tr>
                   </tbody>
                 </table>
                 {result.payback_band && (
@@ -569,6 +592,31 @@ export function ConsumerView() {
                   </p>
                 )}
               </div>
+
+              {result.co2 && (
+                <div className="cv-co2" data-testid="cv-co2">
+                  <div className="cv-sub">Climate impact (CO₂ avoided)</div>
+                  {result.co2.annual_kg != null ? (
+                    <>
+                      <table className="cv-econ-table">
+                        <tbody>
+                          <tr>
+                            <td>Avoided per year</td>
+                            <td>{fmt(result.co2.annual_kg, 0)} kg CO₂</td>
+                          </tr>
+                          <tr>
+                            <td>Avoided over lifetime</td>
+                            <td>{fmt((result.co2.lifetime_kg ?? 0) / 1000, 1)} t CO₂</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <p className="cv-note">{result.co2.note}</p>
+                    </>
+                  ) : (
+                    <p className="cv-note" data-testid="cv-co2-unavailable">{result.co2.note}</p>
+                  )}
+                </div>
+              )}
 
               {result.unverified_panel.length > 0 && (
                 <div className="cv-unverified" data-testid="consumer-unverified-panel">

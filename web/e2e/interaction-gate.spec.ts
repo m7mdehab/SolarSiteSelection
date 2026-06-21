@@ -366,6 +366,48 @@ test.describe('INTERACTION GATE — human-style flows must work and never white-
     expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
   });
 
+  test('consumer: IRR + CO2 render when provided; CO2 says "not available" otherwise', async ({ page }) => {
+    const errs = trackErrors(page);
+    await blockTiles(page);
+    const withEconCo2 = {
+      ...ROOFTOP_RESULT,
+      economics: {
+        ...ROOFTOP_RESULT.economics,
+        install_cost_usd: 45000,
+        net_install_cost_usd: 45000,
+        annual_savings_usd: 3500,
+        simple_payback_years: 12.9,
+        npv_usd: 8000,
+        irr_pct: 7.4,
+        lifetime_savings_usd: 70000,
+        cashflow: [{ year: 0, annual_cash_usd: -45000, cumulative_usd: -45000 }],
+        unverified_inputs: [],
+      },
+      co2: {
+        grid_factor_g_per_kwh: 400,
+        annual_kg: 9600,
+        lifetime_kg: 240000,
+        basis: 'average grid emissions (user-provided factor)',
+        note: 'Using 400 gCO2/kWh (your input). Average, not marginal, emissions.',
+      },
+    };
+    await page.route('**/criteria', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CRITERIA) }),
+    );
+    await page.route('**/consumer/rooftop', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withEconCo2) }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('consumer-view')).toBeVisible();
+    await page.getByTestId('cv-preset-0').click();
+    await page.getByTestId('cv-grid-co2').fill('400');
+    await page.getByTestId('consumer-estimate-btn').click();
+    await expect(page.getByTestId('cv-irr')).toContainText('%');
+    await expect(page.getByTestId('cv-co2')).toContainText('CO₂');
+    await expect(page.getByTestId('cv-co2')).toContainText('per year');
+    expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
+  });
+
   test('utility: click Draw on Map → trace a polygon → run a job', async ({ page }) => {
     const errs = trackErrors(page);
     await blockTiles(page);

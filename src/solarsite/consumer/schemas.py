@@ -22,6 +22,8 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 __all__ = [
+    "CO2Result",
+    "CashflowPoint",
     "ConsumerResult",
     "ConsumptionInput",
     "EconomicInputs",
@@ -112,6 +114,12 @@ class EconomicInputs(BaseModel):
     om_cost_usd_per_kw_yr: float | None = Field(
         default=None, ge=0.0, description="Annual O&M USD/kW/yr. Enter your own estimate."
     )
+    grid_co2_g_per_kwh: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=2000.0,
+        description="Grid carbon intensity gCO2/kWh for CO2 avoided. None -> not shown.",
+    )
     discount_rate: float = Field(
         default=0.05, ge=0.0, le=0.5, description="Real discount rate for NPV (dimensionless)."
     )
@@ -135,6 +143,14 @@ class EnergyBalance(BaseModel):
     dispatch_policy: str
 
 
+class CashflowPoint(BaseModel):
+    """One year of the project cashflow (for the payback/cashflow curve)."""
+
+    year: int
+    annual_cash_usd: float
+    cumulative_usd: float
+
+
 class EconomicsResult(BaseModel):
     """Monetary outcome. Any field may be None when a required input is unverified."""
 
@@ -143,9 +159,23 @@ class EconomicsResult(BaseModel):
     annual_savings_usd: float | None = None
     simple_payback_years: float | None = None
     npv_usd: float | None = None
+    irr_pct: float | None = Field(default=None, description="Internal rate of return (%) or None.")
     lifetime_savings_usd: float | None = None
+    cashflow: list[CashflowPoint] = Field(
+        default_factory=list, description="Per-year discounted-free cashflow incl. year 0 (cost)."
+    )
     unverified_inputs: list[str] = Field(default_factory=list)
     caveats: list[str] = Field(default_factory=list)
+
+
+class CO2Result(BaseModel):
+    """CO2 avoided from a USER-PROVIDED grid factor (never a fabricated default)."""
+
+    grid_factor_g_per_kwh: float | None = None
+    annual_kg: float | None = None
+    lifetime_kg: float | None = None
+    basis: str = ""
+    note: str = ""
 
 
 class UncertaintyBand(BaseModel):
@@ -211,6 +241,9 @@ class ConsumerResult(BaseModel):
     production_detail: ProductionDetail | None = Field(
         default=None,
         description="Orientation-vs-optimum + interannual P50/P90 (when location-derived).",
+    )
+    co2: CO2Result | None = Field(
+        default=None, description="CO2 avoided (only when the user supplied a grid factor)."
     )
 
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from solarsite.consumer.dispatch import self_consumption_split
 from solarsite.consumer.schemas import (
+    CashflowPoint,
+    CO2Result,
     ConsumerResult,
     ConsumptionInput,
     EconomicInputs,
@@ -154,23 +156,87 @@ def compute_economics(balance: EnergyBalance, econ: EconomicInputs) -> Economics
             savings -= balance.capacity_kwp * om
         result.annual_savings_usd = round(savings, 2)
 
-    # Payback / NPV / lifetime savings (need both cost and savings).
+    # Payback / NPV / IRR / lifetime savings + cashflow (need both cost and savings).
     net_cost = result.net_install_cost_usd
     annual_savings = result.annual_savings_usd
     if net_cost is not None and annual_savings is not None and annual_savings > 0:
         result.simple_payback_years = round(net_cost / annual_savings, 2)
         r = econ.discount_rate
         deg = econ.degradation_per_yr
-        npv = -net_cost
-        lifetime = 0.0
-        for t in range(1, econ.analysis_years + 1):
-            cash = annual_savings * (1.0 - deg) ** (t - 1)
-            lifetime += cash
-            npv += cash / (1.0 + r) ** t
+        # Undiscounted yearly cash (savings degrade), year 0 = -net cost.
+        flows = [-net_cost] + [
+            annual_savings * (1.0 - deg) ** (t - 1) for t in range(1, econ.analysis_years + 1)
+        ]
+        npv = sum(cf / (1.0 + r) ** t for t, cf in enumerate(flows))
         result.npv_usd = round(npv, 2)
-        result.lifetime_savings_usd = round(lifetime, 2)
+        result.lifetime_savings_usd = round(sum(flows[1:]), 2)
+        result.irr_pct = _irr(flows)
+        cum = 0.0
+        cashflow: list[CashflowPoint] = []
+        for t, cf in enumerate(flows):
+            cum += cf
+            cashflow.append(
+                CashflowPoint(year=t, annual_cash_usd=round(cf, 2), cumulative_usd=round(cum, 2))
+            )
+        result.cashflow = cashflow
 
     return result
+
+
+def _irr(flows: list[float], *, lo: float = -0.95, hi: float = 2.0) -> float | None:
+    """Internal rate of return (%) by bisection, or None if there's no sign change.
+
+    Pure arithmetic on the user's own cashflow — no market assumption is injected.
+    """
+
+    def npv_at(rate: float) -> float:
+        return sum(cf / (1.0 + rate) ** t for t, cf in enumerate(flows))
+
+    f_lo, f_hi = npv_at(lo), npv_at(hi)
+    if f_lo == 0.0:
+        return round(lo * 100.0, 2)
+    if f_lo * f_hi > 0:
+        return None  # NPV never crosses zero in the bracket — IRR undefined here
+    for _ in range(100):
+        mid = (lo + hi) / 2.0
+        f_mid = npv_at(mid)
+        if abs(f_mid) < 1e-6:
+            return round(mid * 100.0, 2)
+        if f_lo * f_mid < 0:
+            hi = mid
+        else:
+            lo, f_lo = mid, f_mid
+    return round((lo + hi) / 2.0 * 100.0, 2)
+
+
+def compute_co2(balance: EnergyBalance, econ: EconomicInputs, analysis_years: int) -> CO2Result:
+    """CO2 avoided from a USER-PROVIDED grid carbon factor (gCO2/kWh).
+
+    Never fabricates a factor: if the user has not supplied one, returns a result
+    with everything ``None`` and a "not available — enter your grid's gCO2/kWh"
+    note. Uses AVERAGE (not marginal) emissions and states so. Displaced grid
+    energy = generation that is used on-site or exported (both displace grid power).
+    """
+    factor = econ.grid_co2_g_per_kwh
+    if factor is None:
+        return CO2Result(
+            note=(
+                "CO2 estimate not available — enter your grid's carbon intensity "
+                "(gCO2/kWh, e.g. from Ember or your grid operator) to see it."
+            )
+        )
+    displaced_kwh = balance.self_consumed_kwh + balance.exported_kwh
+    annual_kg = displaced_kwh * factor / 1000.0
+    # Lifetime with the same degradation the economics use (production falls slowly).
+    deg = econ.degradation_per_yr
+    lifetime_kg = sum(annual_kg * (1.0 - deg) ** t for t in range(analysis_years))
+    return CO2Result(
+        grid_factor_g_per_kwh=round(factor, 1),
+        annual_kg=round(annual_kg, 1),
+        lifetime_kg=round(lifetime_kg, 1),
+        basis="average grid emissions (user-provided factor); displaced = self-consumed + exported",
+        note=f"Using {factor:g} gCO2/kWh (your input). Average, not marginal, emissions.",
+    )
 
 
 def analyze_rooftop(
@@ -199,6 +265,7 @@ def analyze_rooftop(
     capacity = roof_capacity_kwp(roof)
     balance = energy_balance(capacity, specific_yield_kwh_kwp_yr, consumption, gen_shape=gen_shape)
     economics = compute_economics(balance, econ)
+    co2 = compute_co2(balance, econ, econ.analysis_years)
 
     # ---- physical-sanity gate -------------------------------------------------
     checks = [check_roof_capacity(roof.area_m2, capacity)]
@@ -297,4 +364,5 @@ def analyze_rooftop(
         unverified_panel=panel,
         warnings=warnings,
         production_detail=production_detail,
+        co2=co2,
     )
