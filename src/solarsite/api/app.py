@@ -459,6 +459,7 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
     monthly_per_kwp: list[float] | None = None
     method = "caller_supplied"
     detail = None
+    gen_shape: list[float] | None = None
     sy = body.specific_yield_kwh_kwp_yr
 
     if body.latitude is not None and body.longitude is not None:
@@ -472,6 +473,7 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
             )
             sy = prod.specific_yield_kwh_kwp_yr
             monthly_per_kwp = prod.monthly_kwh_per_kwp
+            gen_shape = prod.diurnal_shape or None
             method = "pvlib_modelchain"
             detail = ProductionDetail(
                 surface_tilt=prod.surface_tilt,
@@ -510,6 +512,7 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
         monthly_kwh_per_kwp=monthly_per_kwp,
         production_method=method,
         production_detail=detail,
+        gen_shape=gen_shape,
     )
 
 

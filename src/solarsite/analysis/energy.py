@@ -57,6 +57,7 @@ from solarsite.analysis.losses import LossStack
 __all__ = [
     "EnergyAssumptions",
     "EnergyResult",
+    "average_diurnal_profile",
     "site_energy",
     "site_energy_from_ghi",
     "specific_yield",
@@ -374,6 +375,46 @@ def specific_yield_with_profile(
     wh = ac_series.to_numpy(dtype=float)
     monthly = [float(wh[months == m].sum()) / 1000.0 * derate for m in range(1, 13)]
     return annual, monthly
+
+
+def average_diurnal_profile(
+    lat: float,
+    lon: float,
+    tmy_df: pd.DataFrame,
+    assumptions: EnergyAssumptions,
+) -> list[float]:
+    """Average normalised 24-hour generation shape (fractions of a day, sum=1).
+
+    Computed from the SAME pvlib ModelChain over the PVGIS TMY (so it is a real,
+    location-specific diurnal shape — not a manufactured bell curve). Feeds the
+    archetype-based self-consumption split (Phase C). Returns 24 fractions summing
+    to 1.0 (or all-zero only if the year produced nothing, which never happens).
+    """
+    tilt = assumptions.effective_tilt(lat)
+    azimuth = assumptions.effective_azimuth(lat)
+    weather = _prepare_weather(tmy_df)
+    location = pvlib.location.Location(latitude=lat, longitude=lon)
+    system = _build_system(
+        tilt=tilt,
+        azimuth=azimuth,
+        inverter_nominal_efficiency=assumptions.loss_stack.inverter_nominal_efficiency,
+    )
+    mc = pvlib.modelchain.ModelChain(
+        system, location, aoi_model="physical", spectral_model="no_loss"
+    )
+    mc.run_model(weather)
+    ac_raw = mc.results.ac
+    if ac_raw is None:
+        raise RuntimeError("ModelChain produced no AC results; check weather inputs.")
+    ac_series: pd.Series = pd.Series(ac_raw).clip(lower=0.0)  # type: ignore[arg-type]
+    idx = pd.DatetimeIndex(ac_series.index)
+    hours = np.array([ts.hour for ts in idx], dtype=int)
+    wh = ac_series.to_numpy(dtype=float)
+    by_hour = np.array([wh[hours == h].sum() for h in range(24)], dtype=float)
+    total = float(by_hour.sum())
+    if total <= 0:
+        return [0.0] * 24
+    return [float(x) / total for x in by_hour]
 
 
 def site_energy(

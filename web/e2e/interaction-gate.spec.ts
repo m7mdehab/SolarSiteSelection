@@ -334,6 +334,38 @@ test.describe('INTERACTION GATE — human-style flows must work and never white-
     expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
   });
 
+  test('consumer: pick load profile + export policy → self-consumption panel renders', async ({ page }) => {
+    const errs = trackErrors(page);
+    await blockTiles(page);
+    const detailed = {
+      ...ROOFTOP_RESULT,
+      energy: {
+        ...ROOFTOP_RESULT.energy,
+        self_consumed_kwh: 9000,
+        exported_kwh: 18000,
+        grid_import_kwh: 3000,
+        self_consumption_ratio: 0.33,
+        self_sufficiency: 0.75,
+        dispatch_policy: 'self_consumption_diurnal_evening',
+      },
+    };
+    await page.route('**/criteria', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CRITERIA) }),
+    );
+    await page.route('**/consumer/rooftop', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(detailed) }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('consumer-view')).toBeVisible();
+    await page.getByTestId('cv-preset-0').click();
+    await page.getByTestId('cv-load-profile').selectOption('daytime');
+    await page.getByTestId('cv-dispatch-policy').selectOption('self_consumption');
+    await page.getByTestId('consumer-estimate-btn').click();
+    await expect(page.getByTestId('cv-selfconsumption')).toBeVisible();
+    await expect(page.getByTestId('cv-selfconsumption')).toContainText('Exported to grid');
+    expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
+  });
+
   test('utility: click Draw on Map → trace a polygon → run a job', async ({ page }) => {
     const errs = trackErrors(page);
     await blockTiles(page);

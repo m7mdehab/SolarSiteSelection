@@ -72,9 +72,17 @@ class ConsumptionInput(BaseModel):
         le=1.0,
         description=(
             "Fraction of PV generation consumed on-site rather than exported. "
-            "If None, an annual-net-metering balance is used instead (export = "
-            "production above annual consumption). Policy- and load-shape-dependent."
+            "If None, the dispatch policy + load archetype are used instead. "
+            "Policy- and load-shape-dependent."
         ),
+    )
+    load_profile: str | None = Field(
+        default=None,
+        description="Load archetype for diurnal matching: 'flat' | 'daytime' | 'evening'.",
+    )
+    dispatch_policy: str | None = Field(
+        default=None,
+        description="'net_metering' | 'self_consumption' | 'no_export'. None -> net_metering.",
     )
 
 

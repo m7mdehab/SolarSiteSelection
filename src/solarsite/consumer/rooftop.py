@@ -8,6 +8,7 @@ gate before it leaves this module.
 
 from __future__ import annotations
 
+from solarsite.consumer.dispatch import self_consumption_split
 from solarsite.consumer.schemas import (
     ConsumerResult,
     ConsumptionInput,
@@ -55,16 +56,18 @@ def energy_balance(
     capacity_kwp: float,
     specific_yield_kwh_kwp_yr: float,
     consumption: ConsumptionInput,
+    *,
+    gen_shape: list[float] | None = None,
 ) -> EnergyBalance:
     """Split annual production into self-consumed / exported / grid-import.
 
-    Two dispatch policies (the LOGIC is fixed; which policy a jurisdiction
-    allows is a user input surfaced in the UI):
+    Dispatch (user-selected; the policy a jurisdiction allows is surfaced in the UI):
 
-    * ``self_consumption_fraction`` given → instantaneous self-consumption: a
-      fixed fraction of production is used on-site (capped at consumption).
-    * otherwise → annual net metering: everything up to annual consumption is
-      self-consumed; the surplus is exported.
+    * an explicit ``self_consumption_fraction`` → a fixed fraction is used on-site
+      (legacy/simple path);
+    * otherwise the chosen ``dispatch_policy`` (net_metering / self_consumption /
+      no_export) is applied, matching the real diurnal generation shape (``gen_shape``)
+      against the chosen ``load_profile`` archetype when a shape is available.
     """
     production = annual_production_kwh(capacity_kwp, specific_yield_kwh_kwp_yr)
     cons = float(consumption.annual_kwh) if consumption.annual_kwh is not None else 0.0
@@ -74,12 +77,20 @@ def energy_balance(
         self_consumed = min(production * float(consumption.self_consumption_fraction), cons)
         if cons == 0.0:
             self_consumed = 0.0
+        exported = max(0.0, production - self_consumed)
+        grid_import = max(0.0, cons - self_consumed)
     else:
-        policy = "annual_net_metering"
-        self_consumed = min(production, cons)
+        chosen = consumption.dispatch_policy or "net_metering"
+        profile = consumption.load_profile or "evening"
+        self_consumed, exported, grid_import = self_consumption_split(
+            production, cons, policy=chosen, gen_shape=gen_shape, load_profile=profile
+        )
+        # Label honestly: note whether the diurnal archetype actually drove it.
+        if chosen == "net_metering" or gen_shape is None:
+            policy = "annual_net_metering" if chosen == "net_metering" else f"{chosen}_annual"
+        else:
+            policy = f"{chosen}_diurnal_{profile}"
 
-    exported = max(0.0, production - self_consumed)
-    grid_import = max(0.0, cons - self_consumed)
     scr = self_consumed / production if production > 0 else 0.0
     self_sufficiency = self_consumed / cons if cons > 0 else 0.0
 
@@ -171,6 +182,7 @@ def analyze_rooftop(
     monthly_kwh_per_kwp: list[float] | None = None,
     production_method: str = "caller_supplied",
     production_detail: ProductionDetail | None = None,
+    gen_shape: list[float] | None = None,
 ) -> ConsumerResult:
     """End-to-end consumer-mode analysis: roof → capacity → energy → economics.
 
@@ -185,7 +197,7 @@ def analyze_rooftop(
     econ = econ or EconomicInputs()
 
     capacity = roof_capacity_kwp(roof)
-    balance = energy_balance(capacity, specific_yield_kwh_kwp_yr, consumption)
+    balance = energy_balance(capacity, specific_yield_kwh_kwp_yr, consumption, gen_shape=gen_shape)
     economics = compute_economics(balance, econ)
 
     # ---- physical-sanity gate -------------------------------------------------

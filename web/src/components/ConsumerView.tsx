@@ -48,6 +48,9 @@ export function ConsumerView() {
   const [orientation, setOrientation] = useState('auto');
   const [tilt, setTilt] = useState('');
   const [shading, setShading] = useState('');
+  // Phase C: how the household uses & sells power.
+  const [loadProfile, setLoadProfile] = useState('evening');
+  const [dispatchPolicy, setDispatchPolicy] = useState('net_metering');
   // Economics — all optional, user-entered (no defaults invented).
   const [costPerW, setCostPerW] = useState('');
   const [tariff, setTariff] = useState('');
@@ -123,7 +126,11 @@ export function ConsumerView() {
         longitude: lon,
         ...orientationToRequest(),
         shading_pct: numOrUndef(shading) ?? null,
-        consumption: { annual_kwh: numOrUndef(annualKwh) ?? null },
+        consumption: {
+          annual_kwh: numOrUndef(annualKwh) ?? null,
+          load_profile: loadProfile,
+          dispatch_policy: dispatchPolicy,
+        },
         economics: econ,
       };
       const res = await analyzeRooftop(req);
@@ -278,6 +285,37 @@ export function ConsumerView() {
           {rangeWarn(annualKwh, 1, 100000, 'Annual use', ' kWh') && (
             <div className="cv-input-warn">⚠ {rangeWarn(annualKwh, 1, 100000, 'Annual use', ' kWh')}</div>
           )}
+
+          <div className="cv-row">
+            <div>
+              <label className="cv-label" title="When you use most power (used to estimate self-consumption)">
+                When do you use power?
+              </label>
+              <select
+                data-testid="cv-load-profile"
+                value={loadProfile}
+                onChange={(e) => setLoadProfile(e.target.value)}
+              >
+                <option value="evening">Mostly evenings</option>
+                <option value="daytime">Mostly daytime</option>
+                <option value="flat">Evenly through the day</option>
+              </select>
+            </div>
+            <div>
+              <label className="cv-label" title="How surplus solar is handled where you live">
+                Export policy
+              </label>
+              <select
+                data-testid="cv-dispatch-policy"
+                value={dispatchPolicy}
+                onChange={(e) => setDispatchPolicy(e.target.value)}
+              >
+                <option value="net_metering">Net metering (bank surplus)</option>
+                <option value="self_consumption">Self-use + feed-in</option>
+                <option value="no_export">No export (use or lose)</option>
+              </select>
+            </div>
+          </div>
 
           <details className="cv-advanced-block">
             <summary>Roof orientation &amp; shading (optional)</summary>
@@ -451,6 +489,38 @@ export function ConsumerView() {
                   </p>
                 </div>
               )}
+
+              <div className="cv-selfconsumption" data-testid="cv-selfconsumption">
+                <div className="cv-sub">What you actually use vs export</div>
+                <table className="cv-econ-table">
+                  <tbody>
+                    <tr>
+                      <td>Self-consumed (used on-site)</td>
+                      <td>
+                        {fmt(result.energy.self_consumed_kwh, 0)} kWh (
+                        {fmt(result.energy.self_consumption_ratio * 100, 0)}% of production)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Exported to grid</td>
+                      <td>{fmt(result.energy.exported_kwh, 0)} kWh</td>
+                    </tr>
+                    <tr>
+                      <td>Still imported from grid</td>
+                      <td>{fmt(result.energy.grid_import_kwh, 0)} kWh</td>
+                    </tr>
+                    <tr>
+                      <td>Bill covered by solar (self-sufficiency)</td>
+                      <td>{fmt(result.energy.self_sufficiency * 100, 0)}%</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p className="cv-note">
+                  Dispatch: {result.energy.dispatch_policy.replace(/_/g, ' ')}. Self-consumption is
+                  archetype-based (your selected load shape matched to this location's average daily
+                  generation), not metered.
+                </p>
+              </div>
 
               {result.monthly_kwh && (
                 <div className="cv-monthly" data-testid="cv-monthly">

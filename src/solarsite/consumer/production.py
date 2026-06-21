@@ -28,7 +28,11 @@ import httpx
 import pandas as pd
 from pydantic import BaseModel, Field
 
-from solarsite.analysis.energy import EnergyAssumptions, specific_yield_with_profile
+from solarsite.analysis.energy import (
+    EnergyAssumptions,
+    average_diurnal_profile,
+    specific_yield_with_profile,
+)
 from solarsite.analysis.losses import LossStack
 
 __all__ = ["LocationProduction", "location_production"]
@@ -65,6 +69,9 @@ class LocationProduction(BaseModel):
         description="90%-exceedance yield from PVGIS interannual SD_y; None if absent.",
     )
     interannual_note: str = ""
+    diurnal_shape: list[float] = Field(
+        default_factory=list, description="Average 24h generation shape (fractions, sum=1)."
+    )
 
 
 def _tiny_aoi(lat: float, lon: float, half: float = 0.02) -> Any:
@@ -189,6 +196,7 @@ def location_production(
 
     a = _assumptions(surface_tilt, surface_azimuth, shading_pct)
     annual, monthly = specific_yield_with_profile(lat, lon, tmy_df, a)
+    diurnal = average_diurnal_profile(lat, lon, tmy_df, a)
     used_tilt = a.effective_tilt(lat)
     used_azimuth = a.effective_azimuth(lat)
 
@@ -227,4 +235,5 @@ def location_production(
         p50_specific_yield_kwh_kwp_yr=round(annual, 1),
         p90_specific_yield_kwh_kwp_yr=None if p90 is None else round(p90, 1),
         interannual_note=note,
+        diurnal_shape=[round(x, 5) for x in diurnal],
     )

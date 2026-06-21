@@ -131,6 +131,8 @@ export interface RooftopRequest {
   consumption?: {
     annual_kwh?: number | null;
     self_consumption_fraction?: number | null;
+    load_profile?: string | null;
+    dispatch_policy?: string | null;
   };
   economics?: {
     install_cost_usd_per_w?: number | null;
