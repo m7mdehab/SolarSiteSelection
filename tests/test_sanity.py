@@ -141,3 +141,35 @@ def test_every_registered_bound_is_self_consistent() -> None:
     for name, b in PHYSICAL_BOUNDS.items():
         assert b.lo < b.hi, f"{name}: lo>=hi"
         assert b.source.strip(), f"{name}: empty source"
+
+
+# ---------------------------------------------------------------------------
+# Absolute consumer guardrails (close the "huge roof passes density-only" hole)
+# ---------------------------------------------------------------------------
+
+
+def test_consumer_plausibility_normal_roof_ok() -> None:
+    from solarsite.validation import check_consumer_plausibility
+
+    hard, warnings = check_consumer_plausibility(roof_area_m2=120.0, capacity_kwp=18.0)
+    assert all(c.ok for c in hard)
+    assert warnings == []
+
+
+def test_consumer_plausibility_huge_roof_fails_hard() -> None:
+    from solarsite.validation import check_consumer_plausibility
+
+    # The exact failure class: a 234,854 m² "roof" -> ~35 MWp passes a 0.25 kWp/m²
+    # density check but must be flagged hard here.
+    hard, warnings = check_consumer_plausibility(roof_area_m2=234854.0, capacity_kwp=35228.0)
+    assert any(not c.ok for c in hard), "huge roof/system must fail the hard envelope"
+    assert warnings, "and must also carry a friendly warning"
+
+
+def test_consumer_plausibility_commercial_roof_warns_not_fails() -> None:
+    from solarsite.validation import check_consumer_plausibility
+
+    # A big-but-real commercial roof: warned ("confirm"), not hard-failed.
+    hard, warnings = check_consumer_plausibility(roof_area_m2=2500.0, capacity_kwp=375.0)
+    assert all(c.ok for c in hard)
+    assert any("larger than a typical building" in w for w in warnings)

@@ -39,12 +39,15 @@ __all__ = [
     "HOURS_PER_YEAR",
     "MAX_MODULE_KWP_PER_M2",
     "PHYSICAL_BOUNDS",
+    "ROOF_AREA_WARN_M2",
+    "SYSTEM_KWP_WARN",
     "Bound",
     "SanityCheck",
     "SanityViolation",
     "assert_within",
     "capacity_factor_from_specific_yield",
     "check",
+    "check_consumer_plausibility",
     "check_energy_result",
     "check_many",
     "check_roof_capacity",
@@ -56,6 +59,17 @@ HOURS_PER_YEAR: float = 8760.0
 #: Hard ceiling on installable DC capacity per m² of module area: 25 % efficient
 #: modules at 1000 W/m² STC = 0.25 kWp/m². Commercial modules do not exceed this.
 MAX_MODULE_KWP_PER_M2: float = 0.25
+
+#: Soft warning threshold for a single rooftop's gross area. Above this it is
+#: larger than a typical building roof — almost always a sloppy/oversized draw
+#: (the failure class that let a 234,854 m² "roof" pass density-only checks). Not
+#: a clamp: the value is still computed, but the user is asked to confirm.
+ROOF_AREA_WARN_M2: float = 2000.0
+
+#: Soft warning threshold for the resulting system size. Above this it is no
+#: longer a household/light-commercial rooftop install (a typical home is 3-15 kWp;
+#: a large commercial roof tops out around a few hundred kWp).
+SYSTEM_KWP_WARN: float = 100.0
 
 
 class Bound(BaseModel):
@@ -148,6 +162,24 @@ PHYSICAL_BOUNDS: dict[str, Bound] = {
         source="PVWatts V5 (std 15%, prem 19%); NREL Gagnon 2016 (16%); commercial <=~25%",
         note="Lab cells exceed this; commercial modules do not.",
     ),
+    # Absolute consumer guardrails — close the "carpet a region but call it a roof"
+    # hole: a density check alone (0.25 kWp/m²) lets an arbitrarily HUGE roof pass.
+    "consumer_roof_area_m2": Bound(
+        name="consumer_roof_area_m2",
+        lo=1.0,
+        hi=100000.0,
+        unit="m2",
+        source="plausibility envelope: a single rooftop, not a land parcel",
+        note="A 'roof' above ~10 ha (100,000 m²) is a mis-draw, not a building.",
+    ),
+    "consumer_system_kwp": Bound(
+        name="consumer_system_kwp",
+        lo=0.05,
+        hi=2000.0,
+        unit="kWp",
+        source="plausibility envelope: household/commercial rooftop, not a PV plant",
+        note="Above ~2 MWp it is a utility plant, not a rooftop system.",
+    ),
 }
 
 
@@ -212,6 +244,42 @@ def check_roof_capacity(roof_area_m2: float, capacity_kwp: float) -> SanityCheck
         unit="kWp",
         message=msg,
     )
+
+
+def check_consumer_plausibility(
+    roof_area_m2: float, capacity_kwp: float
+) -> tuple[list[SanityCheck], list[str]]:
+    """Absolute-size guardrails for the consumer rooftop path.
+
+    Returns ``(hard_checks, warnings)``:
+
+    * ``hard_checks`` — :class:`SanityCheck` entries against the hard
+      ``consumer_roof_area_m2`` / ``consumer_system_kwp`` envelopes. An ``ok=False``
+      entry means the value is physically implausible for a *rooftop* (e.g. a
+      234,854 m² "roof" → ~35 MWp) and the headline must NOT be presented as valid.
+    * ``warnings`` — friendly "confirm this is right" strings for the soft band
+      (larger than a typical building / home system) that do NOT fail sanity but
+      are surfaced to the user. Never a silent clamp.
+
+    This complements :func:`check_roof_capacity` (density only): density alone is
+    satisfied by an arbitrarily large roof, so absolute bounds are required.
+    """
+    hard = [
+        check("consumer_roof_area_m2", roof_area_m2),
+        check("consumer_system_kwp", capacity_kwp),
+    ]
+    warnings: list[str] = []
+    if float(roof_area_m2) > ROOF_AREA_WARN_M2:
+        warnings.append(
+            f"That roof area ({roof_area_m2:,.0f} m²) is larger than a typical building — "
+            "please confirm it's your roof (not a whole block or region)."
+        )
+    if float(capacity_kwp) > SYSTEM_KWP_WARN:
+        warnings.append(
+            f"The resulting system ({capacity_kwp:,.0f} kWp) is larger than a typical home "
+            "install — fine for a commercial roof, but double-check your inputs."
+        )
+    return hard, warnings
 
 
 def check_energy_result(

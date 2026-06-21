@@ -335,3 +335,16 @@ def test_live_location_production_pvgis() -> None:
     assert prod.method == "pvlib_modelchain"
     assert 1400.0 <= prod.specific_yield_kwh_kwp_yr <= 2200.0
     assert sum(prod.monthly_kwh_per_kwp) == pytest.approx(prod.specific_yield_kwh_kwp_yr, rel=1e-3)
+
+
+def test_analyze_rooftop_huge_roof_flags_not_silently_passes() -> None:
+    """The 35-MWp hole: a 234,854 m² roof must NOT silently produce a valid headline."""
+    res = analyze_rooftop(RoofInput(area_m2=234854.0), specific_yield_kwh_kwp_yr=1800.0)
+    assert not res.sanity_ok, "an implausible roof must fail the sanity verdict"
+    assert res.warnings, "and surface a friendly warning"
+
+
+def test_analyze_rooftop_normal_roof_no_warnings() -> None:
+    res = analyze_rooftop(RoofInput(area_m2=120.0), specific_yield_kwh_kwp_yr=1800.0)
+    assert res.sanity_ok
+    assert res.warnings == []

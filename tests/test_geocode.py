@@ -107,3 +107,61 @@ def test_api_geocode_endpoint_failure_is_200(monkeypatch: pytest.MonkeyPatch) ->
     resp = client.get("/geocode", params={"q": "Cairo"})
     assert resp.status_code == 200  # graceful — never a 5xx
     assert resp.json()["results"] == []
+
+
+# A two-result Photon payload where the prominent city is listed SECOND, to prove
+# the prominence re-rank surfaces it first (the "Cairo, Egypt vs tiny US Cairo" bug).
+_CAIRO_RANKING = {
+    "features": [
+        {
+            "geometry": {"type": "Point", "coordinates": [-89.1764, 37.0053]},
+            "properties": {
+                "name": "Cairo",
+                "country": "United States",
+                "state": "Illinois",
+                "osm_key": "place",
+                "osm_value": "town",
+            },
+        },
+        {
+            "geometry": {"type": "Point", "coordinates": [31.2357, 30.0444]},
+            "properties": {
+                "name": "Cairo",
+                "country": "Egypt",
+                "osm_key": "place",
+                "osm_value": "city",
+                "extent": [31.2, 30.1, 31.3, 30.0],
+            },
+        },
+    ]
+}
+
+
+def test_prominence_reranks_city_first(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(geomod, "_photon_request", lambda q, limit: _CAIRO_RANKING)
+    res = geomod.geocode("Cairo")
+    # The Egyptian city (place=city, has extent) must outrank the US town.
+    assert res["results"][0]["label"].endswith("Egypt")
+
+
+def test_reverse_geocode_returns_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(geomod, "_photon_reverse_request", lambda lat, lon: _CAIRO)
+    res = geomod.geocode_reverse(30.0444, 31.2357)
+    assert "Cairo" in res["label"]
+
+
+def test_reverse_geocode_degrades_to_coords(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fail(lat: float, lon: float) -> dict[str, Any]:
+        raise RuntimeError("down")
+
+    monkeypatch.setattr(geomod, "_photon_reverse_request", _fail)
+    res = geomod.geocode_reverse(12.34, 56.78)
+    assert "12.34" in res["label"] and "56.78" in res["label"]
+
+
+def test_api_reverse_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(geomod, "_photon_reverse_request", lambda lat, lon: _CAIRO)
+    client = TestClient(app)
+    resp = client.get("/geocode/reverse", params={"lat": 30.0444, "lon": 31.2357})
+    assert resp.status_code == 200
+    assert "Cairo" in resp.json()["label"]

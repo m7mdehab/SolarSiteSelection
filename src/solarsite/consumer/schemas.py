@@ -175,6 +175,10 @@ class ConsumerResult(BaseModel):
         default_factory=list,
         description="'What we can't verify for your area' — every unsourced/missing input.",
     )
+    warnings: list[str] = Field(
+        default_factory=list,
+        description="Friendly plausibility warnings (e.g. roof larger than a typical building).",
+    )
 
 
 class RooftopAnalysisRequest(BaseModel):

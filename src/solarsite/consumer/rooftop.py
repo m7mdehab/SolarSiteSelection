@@ -18,7 +18,12 @@ from solarsite.consumer.schemas import (
     UncertaintyBand,
 )
 from solarsite.uncertainty import propagate
-from solarsite.validation import check, check_energy_result, check_roof_capacity
+from solarsite.validation import (
+    check,
+    check_consumer_plausibility,
+    check_energy_result,
+    check_roof_capacity,
+)
 
 __all__ = [
     "analyze_rooftop",
@@ -185,6 +190,10 @@ def analyze_rooftop(
     checks = [check_roof_capacity(roof.area_m2, capacity)]
     checks.extend(check_energy_result(specific_yield_kwh_kwp_yr))
     checks.append(check("module_efficiency_fraction", roof.module_efficiency))
+    # Absolute-size guardrails: density alone (above) is satisfied by an arbitrarily
+    # large roof, so an implausible roof/system must also be flagged hard + warned.
+    hard_plausibility, warnings = check_consumer_plausibility(roof.area_m2, capacity)
+    checks.extend(hard_plausibility)
     if economics.simple_payback_years is not None:
         checks.append(check("payback_years", economics.simple_payback_years))
     if econ.install_cost_usd_per_w is not None:
@@ -264,4 +273,5 @@ def analyze_rooftop(
         production_note=production_note,
         payback_band=payback_band,
         unverified_panel=panel,
+        warnings=warnings,
     )

@@ -34,7 +34,7 @@ from solarsite.analysis.registry import (
     ClassScoreReclassification,
     load_registry,
 )
-from solarsite.api.geocode import geocode
+from solarsite.api.geocode import geocode, geocode_reverse
 from solarsite.api.jobs import JobRegistry, LayerProviderFn
 from solarsite.api.render import render_report
 from solarsite.api.schemas import (
@@ -514,9 +514,20 @@ def geocode_search(q: str = "", limit: int = 5) -> dict[str, object]:
     Proxied server-side so the browser sends no cross-origin keystrokes and a
     correct ``User-Agent`` is used. A no-match or an upstream outage returns
     ``200`` with an empty ``results`` list and a ``note`` (never a 5xx), so the
-    UI can degrade gracefully instead of breaking.
+    UI can degrade gracefully instead of breaking. Results are re-ranked by
+    prominence so a major city outranks a same-named hamlet.
     """
     return geocode(q, limit)
+
+
+@app.get("/geocode/reverse")
+def geocode_reverse_lookup(lat: float, lon: float) -> dict[str, object]:
+    """Reverse-geocode a dropped map pin to a place name (OpenStreetMap data).
+
+    Always returns a label: a place name on success, or a coordinate label on a
+    miss/outage — so a pin is never left unlabelled and the UI never breaks.
+    """
+    return geocode_reverse(lat, lon)
 
 
 # ---------------------------------------------------------------------------

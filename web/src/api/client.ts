@@ -84,6 +84,10 @@ export async function geocode(q: string): Promise<GeocodeResponse> {
   return request<GeocodeResponse>(`/geocode?q=${encodeURIComponent(q)}`);
 }
 
+export async function reverseGeocode(lat: number, lon: number): Promise<{ label: string }> {
+  return request<{ label: string }>(`/geocode/reverse?lat=${lat}&lon=${lon}`);
+}
+
 export async function getVersion(): Promise<VersionInfo> {
   return request<VersionInfo>('/version');
 }

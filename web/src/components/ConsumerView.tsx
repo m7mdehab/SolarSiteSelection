@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { analyzeRooftop } from '../api/client';
+import { analyzeRooftop, reverseGeocode } from '../api/client';
 import type { RooftopRequest, RooftopResult } from '../types/api';
 import { fmt } from '../util/format';
 import { GeocoderSearch } from './GeocoderSearch';
@@ -18,6 +18,17 @@ const PRESET_LOCATIONS = [
 // Money figure or an honest placeholder — never a fabricated value.
 function money(v: number | null | undefined): string {
   return typeof v === 'number' && Number.isFinite(v) ? `$${fmt(v, 0)}` : '— enter to see';
+}
+
+// Friendly inline guardrail for a numeric input. Returns a warning string or null.
+// These mirror the backend plausibility envelopes so a nonsense input is caught
+// before the user even presses Estimate (no silent nonsense headline).
+function rangeWarn(raw: string, lo: number, hi: number, label: string, unit = ''): string | null {
+  const v = parseFloat(raw);
+  if (!Number.isFinite(v)) return raw.trim() === '' ? null : `Enter a number for ${label}.`;
+  if (v < lo) return `${label} looks too low (below ${lo}${unit}).`;
+  if (v > hi) return `${label} looks larger than expected (above ${hi}${unit}) — please confirm.`;
+  return null;
 }
 
 export function ConsumerView() {
@@ -55,11 +66,17 @@ export function ConsumerView() {
     mapRef.current?.flyTo(newLat, newLon);
   }
 
-  // Map click (not drawing a roof) drops/moves the pin.
+  // Map click (not drawing a roof) drops/moves the pin, then reverse-geocodes it
+  // to a place name (falls back to coordinates if the lookup is unavailable).
   function handlePick(pLat: number, pLon: number) {
     setLat(pLat);
     setLon(pLon);
     setPlaceLabel(`Pinned: ${pLat.toFixed(4)}, ${pLon.toFixed(4)}`);
+    reverseGeocode(pLat, pLon)
+      .then((r) => r.label && setPlaceLabel(r.label))
+      .catch(() => {
+        /* keep the coordinate label */
+      });
   }
 
   function handleRoofDrawn(area: number) {
@@ -181,6 +198,11 @@ export function ConsumerView() {
               setAreaFromDraw(false);
             }}
           />
+          {rangeWarn(areaM2, 1, 2000, 'Roof area', ' m²') && (
+            <div className="cv-input-warn" data-testid="cv-area-warning">
+              ⚠ {rangeWarn(areaM2, 1, 2000, 'Roof area', ' m²')}
+            </div>
+          )}
           {!drawingRoof ? (
             <button
               type="button"
@@ -216,17 +238,30 @@ export function ConsumerView() {
 
           <div className="cv-row">
             <div>
-              <label className="cv-label">Usable fraction</label>
+              <label className="cv-label" title="Share of the roof actually usable after setbacks, vents and shading">
+                Usable fraction
+              </label>
               <input value={usable} onChange={(e) => setUsable(e.target.value)} />
+              {rangeWarn(usable, 0.05, 1, 'Usable fraction') && (
+                <div className="cv-input-warn">⚠ {rangeWarn(usable, 0.05, 1, 'Usable fraction')}</div>
+              )}
             </div>
             <div>
-              <label className="cv-label">Module efficiency</label>
+              <label className="cv-label" title="STC module efficiency; premium silicon today is ~0.20-0.22">
+                Module efficiency
+              </label>
               <input value={efficiency} onChange={(e) => setEfficiency(e.target.value)} />
+              {rangeWarn(efficiency, 0.05, 0.27, 'Module efficiency') && (
+                <div className="cv-input-warn">⚠ {rangeWarn(efficiency, 0.05, 0.27, 'Module efficiency')}</div>
+              )}
             </div>
           </div>
 
           <label className="cv-label">Annual electricity use (kWh)</label>
           <input value={annualKwh} onChange={(e) => setAnnualKwh(e.target.value)} />
+          {rangeWarn(annualKwh, 1, 100000, 'Annual use', ' kWh') && (
+            <div className="cv-input-warn">⚠ {rangeWarn(annualKwh, 1, 100000, 'Annual use', ' kWh')}</div>
+          )}
 
           <h3 className="cv-econ-head">Economics (optional — your own numbers)</h3>
           <p className="cv-hint">
@@ -274,6 +309,20 @@ export function ConsumerView() {
           {!result && <p className="cv-hint">Set your location and roof, then press Estimate.</p>}
           {result && (
             <>
+              {(result.warnings ?? []).length > 0 && (
+                <div className="cv-warnings" data-testid="cv-warnings" role="alert">
+                  {(result.warnings ?? []).map((w, i) => (
+                    <div key={i} className="cv-warning">⚠ {w}</div>
+                  ))}
+                </div>
+              )}
+              {result.sanity_ok === false && (
+                <div className="cv-warnings cv-warnings-hard" data-testid="cv-sanity-fail" role="alert">
+                  {(result.sanity_messages ?? []).map((m, i) => (
+                    <div key={i} className="cv-warning">⛔ {m}</div>
+                  ))}
+                </div>
+              )}
               <div className="cv-metrics">
                 <div className="cv-metric">
                   <span className="cv-metric-label">System size</span>

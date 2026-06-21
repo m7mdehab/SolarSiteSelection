@@ -248,6 +248,55 @@ test.describe('INTERACTION GATE — human-style flows must work and never white-
     expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
   });
 
+  test('consumer: oversized roof → plausibility warning, no nonsense headline crash', async ({ page }) => {
+    const errs = trackErrors(page);
+    await blockTiles(page);
+    const huge = {
+      ...ROOFTOP_RESULT,
+      energy: { ...ROOFTOP_RESULT.energy, capacity_kwp: 35228 },
+      sanity_ok: false,
+      sanity_messages: ['capacity=35228 kWp exceeds rooftop envelope [0.05, 2000]'],
+      warnings: ['That roof area (234,854 m²) is larger than a typical building — please confirm it.'],
+    };
+    await page.route('**/criteria', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CRITERIA) }),
+    );
+    await page.route('**/consumer/rooftop', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(huge) }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('consumer-view')).toBeVisible();
+    await page.getByTestId('cv-preset-0').click();
+    await page.getByTestId('cv-area').fill('234854');
+    // The inline guardrail fires on the input itself (before Estimate).
+    await expect(page.getByTestId('cv-area-warning')).toBeVisible();
+    await page.getByTestId('consumer-estimate-btn').click();
+    // The result surfaces both the friendly warning and the hard sanity failure.
+    await expect(page.getByTestId('cv-warnings')).toBeVisible();
+    await expect(page.getByTestId('cv-sanity-fail')).toBeVisible();
+    expect(await rootLen(page)).toBeGreaterThan(100);
+    expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
+  });
+
+  test('consumer: map pin is reverse-geocoded to a place name', async ({ page }) => {
+    const errs = trackErrors(page);
+    await blockTiles(page);
+    await page.route('**/criteria', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CRITERIA) }),
+    );
+    await page.route('**/geocode/reverse**', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ label: 'Giza, Egypt', lat: 30, lon: 31 }) }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('consumer-view')).toBeVisible();
+    const map = page.getByTestId('cv-map');
+    await expect(map).toBeVisible();
+    await page.waitForTimeout(700);
+    await clickMapFrac(map, 0.5, 0.5);
+    await expect(page.getByTestId('cv-location-status')).toContainText('Giza, Egypt');
+    expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
+  });
+
   test('utility: click Draw on Map → trace a polygon → run a job', async ({ page }) => {
     const errs = trackErrors(page);
     await blockTiles(page);

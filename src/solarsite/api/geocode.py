@@ -24,9 +24,10 @@ from typing import Any
 
 import httpx
 
-__all__ = ["OSM_ATTRIBUTION", "geocode"]
+__all__ = ["OSM_ATTRIBUTION", "geocode", "geocode_reverse"]
 
 PHOTON_URL = "https://photon.komoot.io/api"
+PHOTON_REVERSE_URL = "https://photon.komoot.io/reverse"
 USER_AGENT = "SolarSiteSelection/1.0 (+https://github.com/m7mdehab/SolarSiteSelection)"
 OSM_ATTRIBUTION = "© OpenStreetMap contributors (geocoding via Photon / komoot)"
 
@@ -40,12 +41,62 @@ def _photon_request(query: str, limit: int) -> dict[str, Any]:
     """Raw Photon call. Isolated so tests can monkeypatch it (no live call in CI)."""
     resp = httpx.get(
         PHOTON_URL,
-        params={"q": query, "limit": limit},
+        # Over-fetch so the prominence re-rank has candidates to reorder, then trim.
+        params={"q": query, "limit": max(limit, 10)},
         headers={"User-Agent": USER_AGENT},
         timeout=_TIMEOUT_S,
     )
     resp.raise_for_status()
     return resp.json()
+
+
+def _photon_reverse_request(lat: float, lon: float) -> dict[str, Any]:
+    """Raw Photon reverse call. Isolated so tests can monkeypatch it."""
+    resp = httpx.get(
+        PHOTON_REVERSE_URL,
+        params={"lat": lat, "lon": lon},
+        headers={"User-Agent": USER_AGENT},
+        timeout=_TIMEOUT_S,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
+# Prominence ranking. Photon returns no population/importance field, so "Cairo"
+# can surface a tiny US Cairo before Cairo, Egypt. We re-rank by place type and
+# geographic extent (a larger bbox ≈ a more prominent place) so the obvious city
+# comes first; every result is still labelled with region + country regardless.
+_PLACE_RANK: dict[str, int] = {
+    "city": 6,
+    "municipality": 5,
+    "town": 4,
+    "borough": 4,
+    "village": 3,
+    "suburb": 2,
+    "hamlet": 2,
+    "locality": 1,
+}
+
+
+def _prominence(props: dict[str, Any]) -> float:
+    """Heuristic prominence score for a Photon feature (higher = more prominent)."""
+    osm_key = props.get("osm_key")
+    osm_value = str(props.get("osm_value") or props.get("type") or "")
+    score = 0.0
+    if osm_key == "place":
+        score += _PLACE_RANK.get(osm_value, 0) * 10.0
+    elif osm_key in ("boundary",):  # administrative areas (states/countries)
+        score += 8.0
+    elif osm_key in ("highway", "building", "address"):
+        score -= 5.0  # streets/houses are rarely the intended "where I live" pick
+    extent = props.get("extent")  # [west, north, east, south]
+    if isinstance(extent, list) and len(extent) == 4:
+        try:
+            w, n, e, s = (float(x) for x in extent)
+            score += min(abs(e - w) * abs(n - s), 25.0)  # bbox area, capped
+        except (TypeError, ValueError):
+            pass
+    return score
 
 
 def _label(props: dict[str, Any]) -> str:
@@ -60,8 +111,8 @@ def _label(props: dict[str, Any]) -> str:
 
 
 def _normalise(raw: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    out: list[dict[str, Any]] = []
-    for feat in raw.get("features", [])[:limit]:
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for feat in raw.get("features", []):
         geom = feat.get("geometry") or {}
         coords = geom.get("coordinates") or []
         if len(coords) < 2:
@@ -73,16 +124,39 @@ def _normalise(raw: dict[str, Any], limit: int) -> list[dict[str, Any]]:
         name = props.get("name")
         if not name:
             continue
-        out.append(
-            {
-                "label": _label(props),
-                "name": str(name),
-                "lat": lat,
-                "lon": lon,
-                "type": str(props.get("type") or props.get("osm_value") or "place"),
-            }
+        scored.append(
+            (
+                _prominence(props),
+                {
+                    "label": _label(props),
+                    "name": str(name),
+                    "lat": lat,
+                    "lon": lon,
+                    "type": str(props.get("type") or props.get("osm_value") or "place"),
+                },
+            )
         )
-    return out
+    # Stable sort by prominence (descending) — Photon's relevance order is the
+    # tiebreak, so equally-prominent matches keep their original ranking.
+    scored.sort(key=lambda t: t[0], reverse=True)
+    return [r for _, r in scored[:limit]]
+
+
+def geocode_reverse(lat: float, lon: float) -> dict[str, Any]:
+    """Reverse-geocode a pin to a place name. Returns ``{label, lat, lon}`` or a
+    coordinate label on miss/outage (never raises — the pin always gets a label)."""
+    fallback = f"Pinned: {lat:.4f}, {lon:.4f}"
+    try:
+        raw = _photon_reverse_request(lat, lon)
+        feats = raw.get("features") or []
+        if feats:
+            props = feats[0].get("properties") or {}
+            label = _label(props)
+            if label:
+                return {"label": label, "lat": lat, "lon": lon, "attribution": OSM_ATTRIBUTION}
+    except Exception:  # network/timeout/parse — fall back to coordinates
+        pass
+    return {"label": fallback, "lat": lat, "lon": lon, "attribution": OSM_ATTRIBUTION}
 
 
 def geocode(query: str, limit: int = 5) -> dict[str, Any]:

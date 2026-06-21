@@ -168,6 +168,7 @@ export interface RooftopResult {
   production_note: string | null;
   payback_band: { low: number; base: number; high: number; basis: string } | null;
   unverified_panel: string[];
+  warnings: string[];
 }
 
 // ---- Geocoding (consumer location search) ----------------------------------
