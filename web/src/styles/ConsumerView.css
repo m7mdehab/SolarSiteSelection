@@ -363,6 +363,36 @@
   color: #1d6b39;
 }
 
+.consumer-card select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 5px;
+  font-size: 13px;
+  background: #fff;
+}
+
+.cv-advanced-block {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border, #e2e5ea);
+  padding-top: 8px;
+}
+
+.cv-advanced-block summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted, #556);
+}
+
+.cv-orientation-detail {
+  background: #f6f8fb;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 8px 0;
+}
+
 /* ---- Plausibility warnings ---- */
 .cv-input-warn {
   font-size: 11px;

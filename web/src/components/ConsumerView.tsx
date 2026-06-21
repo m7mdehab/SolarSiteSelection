@@ -44,6 +44,10 @@ export function ConsumerView() {
   const [usable, setUsable] = useState('0.75');
   const [efficiency, setEfficiency] = useState('0.20');
   const [annualKwh, setAnnualKwh] = useState('6000');
+  // Roof orientation & shading (optional — default 'auto' = the location optimum).
+  const [orientation, setOrientation] = useState('auto');
+  const [tilt, setTilt] = useState('');
+  const [shading, setShading] = useState('');
   // Economics — all optional, user-entered (no defaults invented).
   const [costPerW, setCostPerW] = useState('');
   const [tariff, setTariff] = useState('');
@@ -57,6 +61,16 @@ export function ConsumerView() {
   function numOrUndef(s: string): number | undefined {
     const v = parseFloat(s);
     return Number.isFinite(v) ? v : undefined;
+  }
+
+  // Compass direction -> azimuth (deg clockwise from North). 'auto'/'flat' special.
+  const AZIMUTH: Record<string, number> = {
+    N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315,
+  };
+  function orientationToRequest(): { surface_tilt?: number | null; surface_azimuth?: number | null } {
+    if (orientation === 'auto') return {}; // backend uses the location optimum
+    if (orientation === 'flat') return { surface_tilt: 0 };
+    return { surface_azimuth: AZIMUTH[orientation], surface_tilt: numOrUndef(tilt) ?? null };
   }
 
   function setLocation(newLat: number, newLon: number, label: string) {
@@ -107,6 +121,8 @@ export function ConsumerView() {
         },
         latitude: lat,
         longitude: lon,
+        ...orientationToRequest(),
+        shading_pct: numOrUndef(shading) ?? null,
         consumption: { annual_kwh: numOrUndef(annualKwh) ?? null },
         economics: econ,
       };
@@ -263,6 +279,57 @@ export function ConsumerView() {
             <div className="cv-input-warn">⚠ {rangeWarn(annualKwh, 1, 100000, 'Annual use', ' kWh')}</div>
           )}
 
+          <details className="cv-advanced-block">
+            <summary>Roof orientation &amp; shading (optional)</summary>
+            <p className="cv-hint">
+              Leave on “Best for my location” and we use the optimal tilt facing the equator.
+              Set your real roof to see the difference.
+            </p>
+            <label className="cv-label">Which way does your roof face?</label>
+            <select
+              data-testid="cv-orientation"
+              value={orientation}
+              onChange={(e) => setOrientation(e.target.value)}
+            >
+              <option value="auto">Best for my location (optimal)</option>
+              <option value="flat">Flat roof</option>
+              <option value="N">North</option>
+              <option value="NE">North-East</option>
+              <option value="E">East</option>
+              <option value="SE">South-East</option>
+              <option value="S">South</option>
+              <option value="SW">South-West</option>
+              <option value="W">West</option>
+              <option value="NW">North-West</option>
+            </select>
+            {orientation !== 'auto' && orientation !== 'flat' && (
+              <>
+                <label className="cv-label">Roof tilt (degrees from flat)</label>
+                <input
+                  data-testid="cv-tilt"
+                  value={tilt}
+                  onChange={(e) => setTilt(e.target.value)}
+                  placeholder="e.g. 30 (blank = your latitude)"
+                />
+                {rangeWarn(tilt, 0, 90, 'Tilt', '°') && (
+                  <div className="cv-input-warn">⚠ {rangeWarn(tilt, 0, 90, 'Tilt', '°')}</div>
+                )}
+              </>
+            )}
+            <label className="cv-label" title="Extra shading from trees/buildings beyond the model's default 3%">
+              Shading (%) — nearby trees/buildings
+            </label>
+            <input
+              data-testid="cv-shading"
+              value={shading}
+              onChange={(e) => setShading(e.target.value)}
+              placeholder="blank = model default (3%)"
+            />
+            {rangeWarn(shading, 0, 80, 'Shading', '%') && (
+              <div className="cv-input-warn">⚠ {rangeWarn(shading, 0, 80, 'Shading', '%')}</div>
+            )}
+          </details>
+
           <h3 className="cv-econ-head">Economics (optional — your own numbers)</h3>
           <p className="cv-hint">
             Leave blank if unknown — money figures stay blank rather than guessed.
@@ -359,6 +426,31 @@ export function ConsumerView() {
                   : 'Production: caller-supplied estimate'}
               </div>
               {result.production_note && <p className="cv-note">{result.production_note}</p>}
+
+              {result.production_detail && (
+                <div className="cv-orientation-detail" data-testid="cv-orientation-detail">
+                  <div className="cv-sub">Your roof orientation</div>
+                  <p className="cv-note">
+                    Tilt {fmt(result.production_detail.surface_tilt, 0)}° / azimuth{' '}
+                    {fmt(result.production_detail.surface_azimuth, 0)}° →{' '}
+                    <strong data-testid="cv-orientation-ratio">
+                      {fmt(result.production_detail.orientation_ratio * 100, 0)}% of optimal
+                    </strong>{' '}
+                    (optimum: tilt {fmt(result.production_detail.optimal_tilt, 0)}°,{' '}
+                    {fmt(result.production_detail.optimal_specific_yield_kwh_kwp_yr, 0)} kWh/kWp).
+                    Shading applied: {fmt(result.production_detail.shading_pct, 0)}%.
+                  </p>
+                  <div className="cv-sub">Year-to-year confidence</div>
+                  <p className="cv-note" data-testid="cv-p50p90">
+                    Typical year (P50): {fmt(result.production_detail.p50_specific_yield_kwh_kwp_yr, 0)}{' '}
+                    kWh/kWp.{' '}
+                    {result.production_detail.p90_specific_yield_kwh_kwp_yr != null
+                      ? `Conservative (P90): ${fmt(result.production_detail.p90_specific_yield_kwh_kwp_yr, 0)} kWh/kWp.`
+                      : 'P90 not available for this location.'}
+                    <span className="cv-band-basis"> {result.production_detail.interannual_note}</span>
+                  </p>
+                </div>
+              )}
 
               {result.monthly_kwh && (
                 <div className="cv-monthly" data-testid="cv-monthly">

@@ -27,6 +27,7 @@ __all__ = [
     "EconomicInputs",
     "EconomicsResult",
     "EnergyBalance",
+    "ProductionDetail",
     "RoofInput",
     "RooftopAnalysisRequest",
     "UncertaintyBand",
@@ -148,6 +149,26 @@ class UncertaintyBand(BaseModel):
     basis: str = Field(..., description="What the band reflects (e.g. production model spread).")
 
 
+class ProductionDetail(BaseModel):
+    """Phase B: the user's real orientation vs the optimum + interannual P50/P90.
+
+    Lets the consumer see whether their roof faces the right way and how confident
+    to be year-to-year — without any manufactured numbers (P90 is ``None`` when the
+    interannual source is unreachable).
+    """
+
+    surface_tilt: float = Field(..., description="Tilt used (deg) — the user's roof.")
+    surface_azimuth: float = Field(..., description="Azimuth used (deg CW from N).")
+    optimal_tilt: float
+    optimal_azimuth: float
+    optimal_specific_yield_kwh_kwp_yr: float
+    orientation_ratio: float = Field(..., description="yours / optimal (0..1).")
+    shading_pct: float = Field(..., description="Shading loss applied (replaces the flat 3%).")
+    p50_specific_yield_kwh_kwp_yr: float
+    p90_specific_yield_kwh_kwp_yr: float | None = None
+    interannual_note: str = ""
+
+
 class ConsumerResult(BaseModel):
     """Full consumer-mode result: real energy + (possibly stubbed) economics."""
 
@@ -179,6 +200,10 @@ class ConsumerResult(BaseModel):
         default_factory=list,
         description="Friendly plausibility warnings (e.g. roof larger than a typical building).",
     )
+    production_detail: ProductionDetail | None = Field(
+        default=None,
+        description="Orientation-vs-optimum + interannual P50/P90 (when location-derived).",
+    )
 
 
 class RooftopAnalysisRequest(BaseModel):
@@ -195,5 +220,14 @@ class RooftopAnalysisRequest(BaseModel):
     )
     latitude: float | None = Field(default=None, ge=-90.0, le=90.0)
     longitude: float | None = Field(default=None, ge=-180.0, le=180.0)
+    surface_tilt: float | None = Field(
+        default=None, ge=0.0, le=90.0, description="Roof tilt (deg); None -> |latitude| optimum."
+    )
+    surface_azimuth: float | None = Field(
+        default=None, ge=0.0, le=360.0, description="Roof azimuth (deg CW from N); None -> equator."
+    )
+    shading_pct: float | None = Field(
+        default=None, ge=0.0, le=80.0, description="Shading loss %; None -> model default (3%)."
+    )
     consumption: ConsumptionInput | None = None
     economics: EconomicInputs | None = None

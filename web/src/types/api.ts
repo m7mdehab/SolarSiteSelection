@@ -124,6 +124,9 @@ export interface RooftopRequest {
   };
   latitude?: number;
   longitude?: number;
+  surface_tilt?: number | null;
+  surface_azimuth?: number | null;
+  shading_pct?: number | null;
   specific_yield_kwh_kwp_yr?: number;
   consumption?: {
     annual_kwh?: number | null;
@@ -169,6 +172,18 @@ export interface RooftopResult {
   payback_band: { low: number; base: number; high: number; basis: string } | null;
   unverified_panel: string[];
   warnings: string[];
+  production_detail: {
+    surface_tilt: number;
+    surface_azimuth: number;
+    optimal_tilt: number;
+    optimal_azimuth: number;
+    optimal_specific_yield_kwh_kwp_yr: number;
+    orientation_ratio: number;
+    shading_pct: number;
+    p50_specific_yield_kwh_kwp_yr: number;
+    p90_specific_yield_kwh_kwp_yr: number | null;
+    interannual_note: string;
+  } | null;
 }
 
 // ---- Geocoding (consumer location search) ----------------------------------

@@ -297,6 +297,43 @@ test.describe('INTERACTION GATE — human-style flows must work and never white-
     expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
   });
 
+  test('consumer: orientation-vs-optimal + P50/P90 render from a real roof', async ({ page }) => {
+    const errs = trackErrors(page);
+    await blockTiles(page);
+    const withDetail = {
+      ...ROOFTOP_RESULT,
+      production_detail: {
+        surface_tilt: 0,
+        surface_azimuth: 180,
+        optimal_tilt: 31,
+        optimal_azimuth: 180,
+        optimal_specific_yield_kwh_kwp_yr: 1850,
+        orientation_ratio: 0.88,
+        shading_pct: 3,
+        p50_specific_yield_kwh_kwp_yr: 1800,
+        p90_specific_yield_kwh_kwp_yr: 1650,
+        interannual_note: 'P90 from PVGIS interannual variability (SD_y/E_y = 6.0%).',
+      },
+    };
+    await page.route('**/criteria', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(CRITERIA) }),
+    );
+    await page.route('**/consumer/rooftop', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(withDetail) }),
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('consumer-view')).toBeVisible();
+    await page.getByTestId('cv-preset-0').click();
+    // Open the orientation panel, then pick a non-optimal orientation (human affordance).
+    await page.getByText('Roof orientation & shading').click();
+    await page.getByTestId('cv-orientation').selectOption('flat');
+    await page.getByTestId('consumer-estimate-btn').click();
+    await expect(page.getByTestId('cv-orientation-detail')).toBeVisible();
+    await expect(page.getByTestId('cv-orientation-ratio')).toContainText('% of optimal');
+    await expect(page.getByTestId('cv-p50p90')).toContainText('P90');
+    expect(uncaught(errs), uncaught(errs).join('\n')).toHaveLength(0);
+  });
+
   test('utility: click Draw on Map → trace a polygon → run a job', async ({ page }) => {
     const errs = trackErrors(page);
     await blockTiles(page);

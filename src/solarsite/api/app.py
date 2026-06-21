@@ -55,7 +55,7 @@ from solarsite.api.schemas import (
 from solarsite.api.version import get_version_info
 from solarsite.consumer import RECOMMENDED_RANGES, ConsumerResult, analyze_rooftop
 from solarsite.consumer.production import location_production
-from solarsite.consumer.schemas import RooftopAnalysisRequest
+from solarsite.consumer.schemas import ProductionDetail, RooftopAnalysisRequest
 from solarsite.core import AOI, AOIInvalidGeometryError, AOITooLargeError
 
 log = logging.getLogger(__name__)
@@ -458,14 +458,33 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
     """
     monthly_per_kwp: list[float] | None = None
     method = "caller_supplied"
+    detail = None
     sy = body.specific_yield_kwh_kwp_yr
 
     if body.latitude is not None and body.longitude is not None:
         try:
-            prod = location_production(body.latitude, body.longitude)
+            prod = location_production(
+                body.latitude,
+                body.longitude,
+                surface_tilt=body.surface_tilt,
+                surface_azimuth=body.surface_azimuth,
+                shading_pct=body.shading_pct,
+            )
             sy = prod.specific_yield_kwh_kwp_yr
             monthly_per_kwp = prod.monthly_kwh_per_kwp
             method = "pvlib_modelchain"
+            detail = ProductionDetail(
+                surface_tilt=prod.surface_tilt,
+                surface_azimuth=prod.surface_azimuth,
+                optimal_tilt=prod.optimal_tilt,
+                optimal_azimuth=prod.optimal_azimuth,
+                optimal_specific_yield_kwh_kwp_yr=prod.optimal_specific_yield_kwh_kwp_yr,
+                orientation_ratio=prod.orientation_ratio,
+                shading_pct=prod.shading_pct,
+                p50_specific_yield_kwh_kwp_yr=prod.p50_specific_yield_kwh_kwp_yr,
+                p90_specific_yield_kwh_kwp_yr=prod.p90_specific_yield_kwh_kwp_yr,
+                interannual_note=prod.interannual_note,
+            )
         except Exception as exc:  # PVGIS/network failure — never fabricate a yield
             if sy is None:
                 raise HTTPException(
@@ -490,6 +509,7 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
         econ=body.economics,
         monthly_kwh_per_kwp=monthly_per_kwp,
         production_method=method,
+        production_detail=detail,
     )
 
 

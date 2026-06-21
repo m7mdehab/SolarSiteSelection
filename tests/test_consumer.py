@@ -260,11 +260,15 @@ def test_specific_yield_with_profile_sums_to_annual() -> None:
 def test_location_production_with_injected_tmy() -> None:
     from solarsite.consumer.production import location_production
 
-    prod = location_production(31.2, 27.5, tmy_df=_diurnal_tmy())
+    prod = location_production(31.2, 27.5, tmy_df=_diurnal_tmy(), compute_interannual=False)
     assert prod.method == "pvlib_modelchain"
     assert len(prod.monthly_kwh_per_kwp) == 12
     assert prod.specific_yield_kwh_kwp_yr > 0
     assert prod.surface_azimuth == pytest.approx(180.0)  # northern hemisphere
+    # Phase B: an optimal-orientation comparison is always computed (no extra network).
+    assert 0.0 < prod.orientation_ratio <= 1.0001
+    assert prod.optimal_specific_yield_kwh_kwp_yr >= prod.specific_yield_kwh_kwp_yr - 1e-6
+    assert prod.p90_specific_yield_kwh_kwp_yr is None  # interannual disabled here
 
 
 def test_analyze_rooftop_with_profile_and_band() -> None:
@@ -297,7 +301,7 @@ def test_api_consumer_rooftop_validation_grade(monkeypatch: pytest.MonkeyPatch) 
     import solarsite.api.app as appmod
     from solarsite.consumer.production import LocationProduction
 
-    def _fake_location_production(lat: float, lon: float) -> LocationProduction:
+    def _fake_location_production(lat: float, lon: float, **kwargs: object) -> LocationProduction:
         return LocationProduction(
             latitude=lat,
             longitude=lon,
@@ -306,6 +310,14 @@ def test_api_consumer_rooftop_validation_grade(monkeypatch: pytest.MonkeyPatch) 
             surface_tilt=abs(lat),
             surface_azimuth=180.0,
             method="pvlib_modelchain",
+            shading_pct=3.0,
+            optimal_tilt=abs(lat),
+            optimal_azimuth=180.0,
+            optimal_specific_yield_kwh_kwp_yr=1850.0,
+            orientation_ratio=1800.0 / 1850.0,
+            p50_specific_yield_kwh_kwp_yr=1800.0,
+            p90_specific_yield_kwh_kwp_yr=1650.0,
+            interannual_note="P90 from PVGIS interannual variability (SD_y/E_y = 6.0%).",
         )
 
     monkeypatch.setattr(appmod, "location_production", _fake_location_production)
@@ -335,6 +347,42 @@ def test_live_location_production_pvgis() -> None:
     assert prod.method == "pvlib_modelchain"
     assert 1400.0 <= prod.specific_yield_kwh_kwp_yr <= 2200.0
     assert sum(prod.monthly_kwh_per_kwp) == pytest.approx(prod.specific_yield_kwh_kwp_yr, rel=1e-3)
+
+
+def test_orientation_penalty_for_bad_tilt() -> None:
+    """A flat (tilt=0) roof in a sunny mid-latitude yields LESS than the optimum."""
+    from solarsite.consumer.production import location_production
+
+    flat = location_production(
+        31.2, 27.5, tmy_df=_diurnal_tmy(), surface_tilt=0.0, compute_interannual=False
+    )
+    assert flat.orientation_ratio < 1.0  # flat is below the swept optimum
+    assert flat.surface_tilt == pytest.approx(0.0)
+
+
+def test_shading_reduces_yield_no_double_count() -> None:
+    """User shading replaces the flat 3% — 20% shading yields less than the 3% default."""
+    from solarsite.consumer.production import location_production
+
+    base = location_production(31.2, 27.5, tmy_df=_diurnal_tmy(), compute_interannual=False)
+    shaded = location_production(
+        31.2, 27.5, tmy_df=_diurnal_tmy(), shading_pct=20.0, compute_interannual=False
+    )
+    assert shaded.shading_pct == pytest.approx(20.0)
+    assert shaded.specific_yield_kwh_kwp_yr < base.specific_yield_kwh_kwp_yr
+
+
+def test_p90_from_injected_interannual_cv() -> None:
+    """A supplied interannual CV produces a real, labelled P90 (no manufacturing)."""
+    from solarsite.consumer.production import location_production
+
+    prod = location_production(
+        31.2, 27.5, tmy_df=_diurnal_tmy(), interannual_cv=0.06, compute_interannual=False
+    )
+    assert prod.p90_specific_yield_kwh_kwp_yr is not None
+    # P90 = P50 * (1 - 1.2816*0.06) < P50
+    assert prod.p90_specific_yield_kwh_kwp_yr < prod.p50_specific_yield_kwh_kwp_yr
+    assert "interannual" in prod.interannual_note.lower()
 
 
 def test_analyze_rooftop_huge_roof_flags_not_silently_passes() -> None:

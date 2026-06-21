@@ -14,6 +14,7 @@ from solarsite.consumer.schemas import (
     EconomicInputs,
     EconomicsResult,
     EnergyBalance,
+    ProductionDetail,
     RoofInput,
     UncertaintyBand,
 )
@@ -169,6 +170,7 @@ def analyze_rooftop(
     *,
     monthly_kwh_per_kwp: list[float] | None = None,
     production_method: str = "caller_supplied",
+    production_detail: ProductionDetail | None = None,
 ) -> ConsumerResult:
     """End-to-end consumer-mode analysis: roof → capacity → energy → economics.
 
@@ -210,6 +212,14 @@ def analyze_rooftop(
         f"horizon = {econ.analysis_years} yr",
         f"specific yield = {specific_yield_kwh_kwp_yr} kWh/kWp/yr (from the PV energy engine)",
     ]
+    if production_detail is not None:
+        pd_ = production_detail
+        ledger.insert(
+            2,
+            f"roof orientation = tilt {pd_.surface_tilt}° / azimuth {pd_.surface_azimuth}° "
+            f"(optimum {pd_.optimal_tilt}°/{pd_.optimal_azimuth}° → "
+            f"{pd_.orientation_ratio * 100:.0f}% of optimal); shading = {pd_.shading_pct}%",
+        )
     if economics.unverified_inputs:
         ledger.append(
             "Economic inputs still needed for cost results (enter your own): "
@@ -274,4 +284,5 @@ def analyze_rooftop(
         payback_band=payback_band,
         unverified_panel=panel,
         warnings=warnings,
+        production_detail=production_detail,
     )
