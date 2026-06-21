@@ -12,9 +12,9 @@ Honesty contract
   physical inputs and is real.
 * The MONEY side depends on values that are region- and policy-specific and that
   this project does NOT have verified for the user's area — install $/W, retail
-  tariff, export/feed-in rate, incentives. Those fields default to ``None`` =
-  ``NEEDS_HUMAN_DECISION``. When a required input is ``None`` the dependent
-  output is ``None`` and a caveat is emitted; we never invent a value to fill it.
+  tariff, export/feed-in rate, incentives. Those fields are user-provided and
+  default to ``None``. When a required input is ``None`` the dependent output is
+  ``None`` and a caveat is emitted; we never invent a value to fill it.
 """
 
 from __future__ import annotations
@@ -78,28 +78,30 @@ class ConsumptionInput(BaseModel):
 
 
 class EconomicInputs(BaseModel):
-    """Economic inputs. Money-valued fields default to None = NEEDS_HUMAN_DECISION.
+    """Economic inputs. Money-valued fields are user-provided and default to None.
 
     Recommended RANGES (not values) with sources are exposed on
     :data:`solarsite.consumer.RECOMMENDED_RANGES`. We do not fill these in.
     """
 
     install_cost_usd_per_w: float | None = Field(
-        default=None, gt=0.0, description="Installed cost USD/W_DC. NEEDS_HUMAN_DECISION."
+        default=None, gt=0.0, description="Installed cost USD/W_DC. Enter your own quote."
     )
     retail_tariff_usd_per_kwh: float | None = Field(
-        default=None, ge=0.0, description="Retail electricity price USD/kWh. NEEDS_HUMAN_DECISION."
+        default=None,
+        ge=0.0,
+        description="Retail electricity price USD/kWh. Enter the rate from your bill.",
     )
     export_rate_usd_per_kwh: float | None = Field(
         default=None,
         ge=0.0,
-        description="Feed-in / net-export credit USD/kWh. NEEDS_HUMAN_DECISION (policy).",
+        description="Feed-in / net-export credit USD/kWh. Depends on your local policy.",
     )
     incentive_usd: float | None = Field(
-        default=None, ge=0.0, description="Upfront rebate/credit USD. NEEDS_HUMAN_DECISION."
+        default=None, ge=0.0, description="Upfront rebate/credit USD. Enter if you qualify."
     )
     om_cost_usd_per_kw_yr: float | None = Field(
-        default=None, ge=0.0, description="Annual O&M USD/kW/yr. NEEDS_HUMAN_DECISION."
+        default=None, ge=0.0, description="Annual O&M USD/kW/yr. Enter your own estimate."
     )
     discount_rate: float = Field(
         default=0.05, ge=0.0, le=0.5, description="Real discount rate for NPV (dimensionless)."

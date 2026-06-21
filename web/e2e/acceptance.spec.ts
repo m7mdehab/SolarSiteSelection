@@ -199,6 +199,9 @@ test.describe('Solar Site Selection acceptance test', () => {
   test('full analysis flow: preset AOI -> run -> results -> site detail', async ({ page }) => {
     await page.goto('/');
 
+    // The app now leads with the rooftop view; switch to utility siting first.
+    await page.getByTestId('mode-utility').click();
+
     // Wait for the app to load and criteria to be fetched
     await expect(page.getByTestId('run-analysis-btn')).toBeVisible();
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
+import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useAppContext } from '../context/AppContext';
@@ -9,12 +9,14 @@ import { getLayerPngUrl, getLayerBounds } from '../api/client';
 
 export interface MapHandle {
   fitAoi: (feature: GeoJSON.Feature<GeoJSON.Polygon>) => void;
-  startDraw: () => void;
-  stopDraw: () => void;
+  /** Close the in-progress polygon (>=3 vertices) and emit it. */
+  finishDraw: () => void;
 }
 
 interface MapProps {
   onAoiDrawn: (feature: GeoJSON.Feature<GeoJSON.Polygon>) => void;
+  /** Single source of truth for draw mode — owned by the parent. */
+  isDrawing: boolean;
 }
 
 const SITES_SOURCE = 'sites-source';
@@ -23,12 +25,14 @@ const SITES_OUTLINE_LAYER = 'sites-outline';
 const AOI_SOURCE = 'aoi-source';
 const AOI_FILL_LAYER = 'aoi-fill';
 const AOI_LINE_LAYER = 'aoi-line';
+const DRAW_SOURCE = 'draw-source';
+const DRAW_LINE_LAYER = 'draw-line';
+const DRAW_POINT_LAYER = 'draw-point';
 
-export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, ref) {
+export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn, isDrawing }, ref) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const { state, dispatch } = useAppContext();
-  const [isDrawing, setIsDrawing] = useState(false);
   const drawPoints = useRef<[number, number][]>([]);
   const layerBoundsCache = useRef<Record<string, LayerBounds>>({});
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -82,6 +86,25 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
         type: 'line',
         source: AOI_SOURCE,
         paint: { 'line-color': '#0EA5E9', 'line-width': 2 },
+      });
+
+      // In-progress draw preview (vertices + connecting line)
+      map.addSource(DRAW_SOURCE, {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+      });
+      map.addLayer({
+        id: DRAW_LINE_LAYER,
+        type: 'line',
+        source: DRAW_SOURCE,
+        paint: { 'line-color': '#16A34A', 'line-width': 2, 'line-dasharray': [2, 1] },
+      });
+      map.addLayer({
+        id: DRAW_POINT_LAYER,
+        type: 'circle',
+        source: DRAW_SOURCE,
+        filter: ['==', '$type', 'Point'],
+        paint: { 'circle-radius': 4, 'circle-color': '#16A34A' },
       });
 
       // Add sites source/layers
@@ -276,23 +299,62 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.selectedSite]);
 
-  // Drawing mode
-  const startDraw = useCallback(() => {
+  // ---- Drawing mode (isDrawing is owned by the parent, passed as a prop) ----
+
+  // Render the in-progress polygon preview (vertices + connecting line).
+  const renderPreview = useCallback(() => {
     const map = mapRef.current;
-    if (!map) return;
-    setIsDrawing(true);
-    drawPoints.current = [];
-    map.getCanvas().style.cursor = 'crosshair';
+    const src = map?.getSource(DRAW_SOURCE) as maplibregl.GeoJSONSource | undefined;
+    if (!src) return;
+    const pts = drawPoints.current;
+    const features: GeoJSON.Feature[] = pts.map((p) => ({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Point', coordinates: p },
+    }));
+    if (pts.length >= 2) {
+      features.push({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: pts },
+      });
+    }
+    src.setData({ type: 'FeatureCollection', features });
   }, []);
 
-  const stopDraw = useCallback(() => {
+  // Close the current polygon (>=3 vertices) and emit it. Shared by the
+  // double-click shortcut and the explicit "Finish" button (imperative handle).
+  const finishDraw = useCallback(() => {
+    const map = mapRef.current;
+    const pts = drawPoints.current;
+    if (pts.length >= 3) {
+      const coords = [...pts, pts[0]] as [number, number][];
+      onAoiDrawn({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Polygon', coordinates: [coords] },
+      });
+    }
+    drawPoints.current = [];
+    renderPreview();
+    if (map) map.getCanvas().style.cursor = '';
+  }, [onAoiDrawn, renderPreview]);
+
+  // React to draw-mode toggles: reset points + cursor on enter/exit.
+  useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    setIsDrawing(false);
     drawPoints.current = [];
-    map.getCanvas().style.cursor = '';
-  }, []);
+    renderPreview();
+    // Only mutate the cursor once the map's canvas is ready.
+    try {
+      map.getCanvas().style.cursor = isDrawing ? 'crosshair' : '';
+    } catch {
+      // canvas not ready yet — the click handlers still gate on isDrawing
+    }
+  }, [isDrawing, renderPreview]);
 
+  // Click to add a vertex; double-click to finish. Gated on the isDrawing prop.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -300,26 +362,13 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
     function handleClick(e: maplibregl.MapMouseEvent) {
       if (!isDrawing) return;
       drawPoints.current.push([e.lngLat.lng, e.lngLat.lat]);
+      renderPreview();
     }
 
     function handleDblClick(e: maplibregl.MapMouseEvent) {
       if (!isDrawing) return;
       e.preventDefault();
-      if (drawPoints.current.length >= 3) {
-        const coords = [
-          ...drawPoints.current,
-          drawPoints.current[0],
-        ] as [number, number][];
-        const feature: GeoJSON.Feature<GeoJSON.Polygon> = {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'Polygon', coordinates: [coords] },
-        };
-        onAoiDrawn(feature);
-      }
-      setIsDrawing(false);
-      drawPoints.current = [];
-      if (map) map.getCanvas().style.cursor = '';
+      finishDraw();
     }
 
     map.on('click', handleClick);
@@ -329,7 +378,7 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
       map.off('click', handleClick);
       map.off('dblclick', handleDblClick);
     };
-  }, [isDrawing, onAoiDrawn]);
+  }, [isDrawing, renderPreview, finishDraw]);
 
   // Expose imperative handle
   useImperativeHandle(ref, () => ({
@@ -347,8 +396,7 @@ export const Map = forwardRef<MapHandle, MapProps>(function Map({ onAoiDrawn }, 
         { padding: 60, duration: 800 }
       );
     },
-    startDraw,
-    stopDraw,
+    finishDraw,
   }));
 
   return (

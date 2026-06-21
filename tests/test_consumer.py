@@ -153,7 +153,7 @@ def test_assumptions_ledger_lists_stubs() -> None:
     res = analyze_rooftop(RoofInput(area_m2=60.0), specific_yield_kwh_kwp_yr=1700.0)
     joined = " ".join(res.assumptions)
     assert "usable roof fraction" in joined
-    assert "NEEDS_HUMAN_DECISION" in joined
+    assert "Economic inputs still needed" in joined
 
 
 def test_no_utility_defaults_leak_in() -> None:

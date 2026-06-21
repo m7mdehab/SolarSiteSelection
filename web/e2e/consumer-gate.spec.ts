@@ -74,6 +74,7 @@ test.describe('CONSUMER RENDER GATE — rooftop breakdown must display', () => {
     await page.goto('/');
     await page.getByTestId('mode-rooftop').click();
     await expect(page.getByTestId('consumer-view')).toBeVisible();
+    await page.getByTestId('cv-preset-0').click(); // set a location (validation-grade path)
     await page.getByTestId('cv-area').fill('100');
     await page.getByTestId('consumer-estimate-btn').click();
 
@@ -93,6 +94,7 @@ test.describe('CONSUMER RENDER GATE — rooftop breakdown must display', () => {
     await mockConsumer(page, false);
     await page.goto('/');
     await page.getByTestId('mode-rooftop').click();
+    await page.getByTestId('cv-preset-0').click(); // set a location
     await page.getByTestId('cv-area').fill('100');
     await page.getByTestId('consumer-estimate-btn').click();
 

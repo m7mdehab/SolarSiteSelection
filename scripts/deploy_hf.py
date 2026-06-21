@@ -21,11 +21,49 @@ to build the image is uploaded; local-only dirs (``_pm/``, ``.git/``,
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import subprocess
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _git(*args: str) -> str:
+    """Run a git command in the repo, returning stripped stdout ('' on failure)."""
+    try:
+        return subprocess.run(
+            ["git", *args],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def _write_version_file() -> dict[str, str]:
+    """Bake the source GitHub commit into data/version.json (for GET /version).
+
+    The HF Space has its own git history, so the Space SHA is not a GitHub SHA;
+    this file lets the running build self-report the exact GitHub commit it was
+    built from. Uploaded to the Space and copied into the image by the Dockerfile.
+    """
+    sha = _git("rev-parse", "HEAD") or "unknown"
+    describe = _git("describe", "--tags", "--always", "--dirty")
+    info = {
+        "git_sha": sha,
+        "git_describe": describe,
+        "deployed_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    out = REPO_ROOT / "data" / "version.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(info, indent=2) + "\n", encoding="utf-8")
+    return info
+
 
 # HF Space README front-matter (Docker SDK, port 7860).
 _SPACE_HEADER = """---
@@ -70,6 +108,7 @@ _INCLUDE = [
     "web/vite.config.ts",
     "web/eslint.config.js",
     "data/cache",  # the real ~2 MB offline demo cache (gitignored locally)
+    "data/version.json",  # deploy-traceability file (written at deploy time)
 ]
 
 
@@ -104,6 +143,12 @@ def deploy(space_id: str, *, dry_run: bool, private: bool) -> int:
     if not token and not dry_run:
         print("ERROR: HF_TOKEN not set (put it in .env or the environment).", file=sys.stderr)
         return 2
+
+    version = _write_version_file()
+    print(
+        f"Source commit: {version['git_sha']} ({version['git_describe']}) "
+        f"@ {version['deployed_at']}"
+    )
 
     cache_dir = REPO_ROOT / "data" / "cache"
     cache_files = [f for f in cache_dir.rglob("*") if f.is_file() and f.name != ".gitkeep"]

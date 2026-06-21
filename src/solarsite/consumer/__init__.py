@@ -6,8 +6,8 @@ utility-scale "carpet the region" figure. Energy outputs are real; monetary
 outputs are ``None`` until their region-specific inputs are verified.
 
 ``RECOMMENDED_RANGES`` documents published RANGES (not point values) for each
-``NEEDS_HUMAN_DECISION`` economic input, for the morning queue and the UI. These
-are ranges to inform a human decision — the engine does NOT use them as values.
+user-provided economic input, shown in the UI to orient the user. These are
+ranges only — the engine never uses them as values.
 """
 
 from __future__ import annotations
@@ -50,8 +50,8 @@ __all__ = [
     "roof_capacity_kwp",
 ]
 
-#: Published RANGES for the NEEDS_HUMAN_DECISION economic inputs. Ranges, not
-#: values — to inform a human, never consumed by the engine. Each range cites a
+#: Published RANGES for the user-provided economic inputs. Ranges, not values —
+#: shown to orient the user, never consumed by the engine. Each range cites a
 #: real, verified source inline.
 RECOMMENDED_RANGES: dict[str, dict[str, str]] = {
     "install_cost_usd_per_w": {

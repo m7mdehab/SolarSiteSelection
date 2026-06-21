@@ -68,3 +68,15 @@
   color: #C2410C;
   border: 1px solid #FED7AA;
 }
+
+.aoi-btn-primary {
+  background: var(--color-accent, #2f6df0);
+  color: #fff;
+  border-color: var(--color-accent, #2f6df0);
+}
+
+.aoi-draw-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+}

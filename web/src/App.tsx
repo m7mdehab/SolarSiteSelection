@@ -11,6 +11,7 @@ import { RankingTable } from './components/RankingTable';
 import { DownloadButtons } from './components/DownloadButtons';
 import { SitePopup } from './components/SitePopup';
 import { ConsumerView } from './components/ConsumerView';
+import { VersionFooter } from './components/VersionFooter';
 import type { AppState } from './context/AppContext';
 import './styles/App.css';
 
@@ -94,7 +95,8 @@ export function App() {
   const mapRef = useRef<MapHandle>(null);
   const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [mode, setMode] = useState<'utility' | 'rooftop'>('utility');
+  // Lead with the rooftop ("solar for where YOU live") experience; utility is one click away.
+  const [mode, setMode] = useState<'utility' | 'rooftop'>('rooftop');
 
   // Fetch criteria on mount
   useEffect(() => {
@@ -131,14 +133,19 @@ export function App() {
     mapRef.current?.fitAoi(feature);
   }
 
+  // isDrawing is the single source of truth, owned here and passed to <Map>.
   function handleStartDraw() {
     setIsDrawing(true);
-    mapRef.current?.startDraw();
   }
 
   function handleStopDraw() {
     setIsDrawing(false);
-    mapRef.current?.stopDraw();
+  }
+
+  function handleFinishDraw() {
+    // Map closes the in-progress polygon and calls handleAoiDrawn (which clears
+    // isDrawing). If too few vertices, it simply clears the preview.
+    mapRef.current?.finishDraw();
   }
 
   async function handleRunAnalysis() {
@@ -207,6 +214,7 @@ export function App() {
               onSelectPreset={handlePresetSelect}
               onStartDraw={handleStartDraw}
               onStopDraw={handleStopDraw}
+              onFinishDraw={handleFinishDraw}
               isDrawing={isDrawing}
             />
             <CriteriaPanel />
@@ -226,7 +234,7 @@ export function App() {
 
         {/* Map */}
         <main className="app-map-area">
-          <Map ref={mapRef} onAoiDrawn={handleAoiDrawn} />
+          <Map ref={mapRef} onAoiDrawn={handleAoiDrawn} isDrawing={isDrawing} />
           {state.job && (
             <div className="app-map-overlay">
               <LayerPanel lsiClassesFromApi={state.criteria?.lsi_classes} />
@@ -259,6 +267,7 @@ export function App() {
         )}
       </div>
       )}
+      <VersionFooter />
     </div>
   );
 }

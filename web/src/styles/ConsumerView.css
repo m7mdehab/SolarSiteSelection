@@ -234,6 +234,135 @@
   color: var(--color-text-muted, #667);
 }
 
+/* ---- Location search + map ---- */
+.geocoder {
+  position: relative;
+  margin: 6px 0;
+}
+
+.geocoder-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.geocoder-busy {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  color: var(--color-text-muted, #889);
+  font-size: 14px;
+}
+
+.geocoder-results {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.geocoder-suggestion {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border: none;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.geocoder-suggestion:hover {
+  background: #eef3fc;
+}
+
+.geocoder-note {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #8a5a00;
+  background: #fff4e5;
+}
+
+.cv-map {
+  width: 100%;
+  height: 240px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 8px 0;
+  border: 1px solid var(--color-border, #cdd2da);
+}
+
+.cv-location-status {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+  margin-bottom: 6px;
+}
+
+.cv-presets-label {
+  font-size: 11px;
+  color: var(--color-text-muted, #889);
+  margin-right: 4px;
+}
+
+.cv-advanced-toggle {
+  background: none;
+  border: none;
+  color: var(--color-accent, #2f6df0);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.cv-section-head {
+  margin-top: 18px !important;
+  border-top: 1px solid var(--color-border, #e2e5ea);
+  padding-top: 12px;
+}
+
+.cv-draw-roof-btn {
+  margin-top: 6px;
+  margin-right: 6px;
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border, #cdd2da);
+  border-radius: 5px;
+  background: #f4f6f9;
+  cursor: pointer;
+}
+
+.cv-btn-primary {
+  background: var(--color-accent, #2f6df0);
+  color: #fff;
+  border-color: var(--color-accent, #2f6df0);
+}
+
+.cv-draw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cv-draw-hint,
+.cv-area-note {
+  font-size: 11px;
+  color: var(--color-text-muted, #667);
+}
+
+.cv-area-note {
+  margin-top: 4px;
+  color: #1d6b39;
+}
+
 /* Mode toggle in the header */
 .mode-toggle {
   display: inline-flex;

@@ -139,6 +139,8 @@ function uncaught(errs: string[]): string[] {
 
 async function runFlow(page: Page): Promise<void> {
   await page.goto('/');
+  // The app now leads with the rooftop view; switch to utility siting first.
+  await page.getByTestId('mode-utility').click();
   await expect(page.getByTestId('run-analysis-btn')).toBeVisible();
   await page.getByTestId('aoi-preset-select').selectOption('nw-coast-egypt');
   await page.getByTestId('run-analysis-btn').click();

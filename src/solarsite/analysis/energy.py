@@ -102,7 +102,7 @@ class EnergyAssumptions(BaseModel):
         reflects ground-mounted utility-scale PV at ~20% land coverage with
         modern bifacial modules and typical row spacing.
     capex_per_kwp:
-        Overnight capital cost in USD per kWp-DC nameplate.
+        Installed capital cost in USD per kWp-DC nameplate (excluding financing).
     opex_per_kwp_yr:
         Annual operating cost in USD per kWp-DC nameplate (O&M + insurance).
     discount_rate:

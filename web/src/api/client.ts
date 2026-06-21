@@ -9,6 +9,8 @@ import type {
   SitesGeoJSON,
   RooftopRequest,
   RooftopResult,
+  GeocodeResponse,
+  VersionInfo,
 } from '../types/api';
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || '';
@@ -76,4 +78,12 @@ export async function analyzeRooftop(data: RooftopRequest): Promise<RooftopResul
 
 export async function getRecommendedRanges(): Promise<Record<string, Record<string, string>>> {
   return request<Record<string, Record<string, string>>>('/consumer/recommended-ranges');
+}
+
+export async function geocode(q: string): Promise<GeocodeResponse> {
+  return request<GeocodeResponse>(`/geocode?q=${encodeURIComponent(q)}`);
+}
+
+export async function getVersion(): Promise<VersionInfo> {
+  return request<VersionInfo>('/version');
 }

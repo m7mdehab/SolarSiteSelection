@@ -7,10 +7,17 @@ interface AoiPanelProps {
   onSelectPreset: (id: string) => void;
   onStartDraw: () => void;
   onStopDraw: () => void;
+  onFinishDraw: () => void;
   isDrawing: boolean;
 }
 
-export function AoiPanel({ onSelectPreset, onStartDraw, onStopDraw, isDrawing }: AoiPanelProps) {
+export function AoiPanel({
+  onSelectPreset,
+  onStartDraw,
+  onStopDraw,
+  onFinishDraw,
+  isDrawing,
+}: AoiPanelProps) {
   const { state } = useAppContext();
   const fileRef = useRef<HTMLInputElement>(null);
   const { dispatch } = useAppContext();
@@ -68,13 +75,24 @@ export function AoiPanel({ onSelectPreset, onStartDraw, onStopDraw, isDrawing }:
       </select>
 
       <div className="aoi-actions">
-        <button
-          className={`aoi-btn ${isDrawing ? 'aoi-btn-active' : ''}`}
-          onClick={isDrawing ? onStopDraw : onStartDraw}
-          data-testid="draw-aoi-btn"
-        >
-          {isDrawing ? 'Stop Drawing' : 'Draw on Map'}
-        </button>
+        {!isDrawing ? (
+          <button className="aoi-btn" onClick={onStartDraw} data-testid="draw-aoi-btn">
+            Draw on Map
+          </button>
+        ) : (
+          <>
+            <button
+              className="aoi-btn aoi-btn-primary"
+              onClick={onFinishDraw}
+              data-testid="finish-aoi-btn"
+            >
+              Finish polygon
+            </button>
+            <button className="aoi-btn aoi-btn-active" onClick={onStopDraw} data-testid="cancel-aoi-btn">
+              Cancel
+            </button>
+          </>
+        )}
         <button
           className="aoi-btn"
           onClick={() => fileRef.current?.click()}
@@ -90,6 +108,12 @@ export function AoiPanel({ onSelectPreset, onStartDraw, onStopDraw, isDrawing }:
           onChange={handleFileUpload}
         />
       </div>
+
+      {isDrawing && (
+        <div className="aoi-draw-hint" data-testid="aoi-draw-hint">
+          Click the map to add corners, then “Finish polygon” (or double-click).
+        </div>
+      )}
 
       {area !== null && (
         <div className={`aoi-area-feedback ${areaWarning ? 'aoi-area-warning' : 'aoi-area-ok'}`} data-testid="aoi-area-feedback">

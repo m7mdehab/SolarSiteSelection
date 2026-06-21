@@ -10,6 +10,9 @@ GET  /jobs/{id}/layers/{name}.png    → colormapped layer PNG
 GET  /jobs/{id}/layers/{name}.bounds → WGS-84 bounding box JSON
 GET  /jobs/{id}/sites.geojson        → ranked candidate sites (WGS-84)
 GET  /jobs/{id}/report.pdf           → PDF report (501 until P3.3)
+POST /consumer/rooftop               → household rooftop-PV analysis
+GET  /geocode?q=                     → place search (OSM via Photon, proxied)
+GET  /version                        → source GitHub commit of the running build
 
 The app exposes a ``_registry`` attribute (JobRegistry instance) so tests can
 inject a custom layer provider without patching module globals.
@@ -31,6 +34,7 @@ from solarsite.analysis.registry import (
     ClassScoreReclassification,
     load_registry,
 )
+from solarsite.api.geocode import geocode
 from solarsite.api.jobs import JobRegistry, LayerProviderFn
 from solarsite.api.render import render_report
 from solarsite.api.schemas import (
@@ -48,6 +52,7 @@ from solarsite.api.schemas import (
     LsiClassOut,
     ReclassOut,
 )
+from solarsite.api.version import get_version_info
 from solarsite.consumer import RECOMMENDED_RANGES, ConsumerResult, analyze_rooftop
 from solarsite.consumer.production import location_production
 from solarsite.consumer.schemas import RooftopAnalysisRequest
@@ -447,9 +452,9 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
     (pvlib ModelChain on the PVGIS TMY for that point, with a monthly profile), or
     a caller ``specific_yield_kwh_kwp_yr`` directly. Capacity derives from the roof
     area, so this can NEVER produce a utility-scale figure. Monetary outputs are
-    ``null`` whenever their region-specific input is an unverified
-    ``NEEDS_HUMAN_DECISION`` stub (named in ``economics.unverified_inputs`` and the
-    ``unverified_panel``). The physical-sanity verdict is in ``sanity_ok``.
+    ``null`` whenever their region-specific input was not provided by the user
+    (named in ``economics.unverified_inputs`` and the ``unverified_panel``). The
+    physical-sanity verdict is in ``sanity_ok``.
     """
     monthly_per_kwp: list[float] | None = None
     method = "caller_supplied"
@@ -490,12 +495,39 @@ def consumer_rooftop(body: RooftopAnalysisRequest) -> ConsumerResult:
 
 @app.get("/consumer/recommended-ranges")
 def consumer_recommended_ranges() -> dict[str, dict[str, str]]:
-    """Published RANGES (not values) for the stubbed economic inputs + their sources.
+    """Published RANGES (not values) for the user-provided economic inputs + sources.
 
-    For the UI / morning queue to inform a human decision; the engine never
-    consumes these as values.
+    Shown in the UI to orient the user; the engine never consumes these as values.
     """
     return RECOMMENDED_RANGES
+
+
+# ---------------------------------------------------------------------------
+# GET /geocode  (consumer location search — OSM via Photon, server-proxied)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/geocode")
+def geocode_search(q: str = "", limit: int = 5) -> dict[str, object]:
+    """Look up a place name and return matching locations (OpenStreetMap data).
+
+    Proxied server-side so the browser sends no cross-origin keystrokes and a
+    correct ``User-Agent`` is used. A no-match or an upstream outage returns
+    ``200`` with an empty ``results`` list and a ``note`` (never a 5xx), so the
+    UI can degrade gracefully instead of breaking.
+    """
+    return geocode(q, limit)
+
+
+# ---------------------------------------------------------------------------
+# GET /version  (deploy traceability — which GitHub commit is running)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/version")
+def version() -> dict[str, object]:
+    """Source-commit identity of the running build (GitHub SHA + describe)."""
+    return get_version_info()
 
 
 # ---------------------------------------------------------------------------

@@ -52,7 +52,10 @@ RUN uv sync --locked --no-dev
 # calls at runtime. In CI this is just the .gitkeep marker (the real cache is
 # gitignored); at deploy (P4.4) the HF Space build context carries the real
 # ~2 MB cache, uploaded by scripts/deploy_hf.py.
-COPY data/cache/ ./data/cache/
+# Copy the whole data/ dir (data/manual is .dockerignore'd): this carries both the
+# offline cache and the deploy-traceability data/version.json (written by
+# scripts/deploy_hf.py) so GET /version can self-report the source GitHub commit.
+COPY data/ ./data/
 # Diagnostic: record how many cache layers were baked in (visible in build logs).
 RUN echo "baked cache files: $(find data/cache -type f | wc -l)" && ls -la data/cache
 

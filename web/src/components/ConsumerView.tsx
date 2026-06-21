@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { analyzeRooftop } from '../api/client';
 import type { RooftopRequest, RooftopResult } from '../types/api';
 import { fmt } from '../util/format';
+import { GeocoderSearch } from './GeocoderSearch';
+import { LocationMap, type LocationMapHandle } from './LocationMap';
 import '../styles/ConsumerView.css';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -19,9 +21,15 @@ function money(v: number | null | undefined): string {
 }
 
 export function ConsumerView() {
-  const [lat, setLat] = useState('31.1');
-  const [lon, setLon] = useState('27.5');
+  const mapRef = useRef<LocationMapHandle>(null);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lon, setLon] = useState<number | null>(null);
+  const [placeLabel, setPlaceLabel] = useState<string>('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const [areaM2, setAreaM2] = useState('100');
+  const [areaFromDraw, setAreaFromDraw] = useState(false);
+  const [drawingRoof, setDrawingRoof] = useState(false);
   const [usable, setUsable] = useState('0.75');
   const [efficiency, setEfficiency] = useState('0.20');
   const [annualKwh, setAnnualKwh] = useState('6000');
@@ -40,7 +48,31 @@ export function ConsumerView() {
     return Number.isFinite(v) ? v : undefined;
   }
 
+  function setLocation(newLat: number, newLon: number, label: string) {
+    setLat(newLat);
+    setLon(newLon);
+    setPlaceLabel(label);
+    mapRef.current?.flyTo(newLat, newLon);
+  }
+
+  // Map click (not drawing a roof) drops/moves the pin.
+  function handlePick(pLat: number, pLon: number) {
+    setLat(pLat);
+    setLon(pLon);
+    setPlaceLabel(`Pinned: ${pLat.toFixed(4)}, ${pLon.toFixed(4)}`);
+  }
+
+  function handleRoofDrawn(area: number) {
+    setAreaM2(area.toFixed(1));
+    setAreaFromDraw(true);
+    setDrawingRoof(false);
+  }
+
   async function handleEstimate() {
+    if (lat == null || lon == null) {
+      setError('Set your location first — search a place, click the map, or pick an example.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -56,8 +88,8 @@ export function ConsumerView() {
           usable_fraction: numOrUndef(usable),
           module_efficiency: numOrUndef(efficiency),
         },
-        latitude: numOrUndef(lat),
-        longitude: numOrUndef(lon),
+        latitude: lat,
+        longitude: lon,
         consumption: { annual_kwh: numOrUndef(annualKwh) ?? null },
         economics: econ,
       };
@@ -72,41 +104,116 @@ export function ConsumerView() {
   }
 
   const maxMonthly = result?.monthly_kwh ? Math.max(...result.monthly_kwh, 1) : 1;
+  const hasLocation = lat != null && lon != null;
 
   return (
     <div className="consumer-view" data-testid="consumer-view">
       <div className="consumer-grid">
         {/* ---- Inputs ---- */}
         <section className="consumer-card">
-          <h3>Your rooftop</h3>
+          <h3>Where do you live?</h3>
+          <p className="cv-hint">
+            Search for your town or address, or click the map to drop a pin. Your location
+            sets the validation-grade solar resource for the estimate.
+          </p>
 
-          <label className="cv-label">Location</label>
+          <GeocoderSearch onSelect={setLocation} />
+
+          <LocationMap
+            ref={mapRef}
+            lat={lat}
+            lon={lon}
+            drawingRoof={drawingRoof}
+            onPick={handlePick}
+            onRoofDrawn={handleRoofDrawn}
+          />
+
+          <div className="cv-location-status" data-testid="cv-location-status">
+            {hasLocation ? placeLabel || `${lat?.toFixed(4)}, ${lon?.toFixed(4)}` : 'No location set yet.'}
+          </div>
+
           <div className="cv-presets">
-            {PRESET_LOCATIONS.map((p) => (
+            <span className="cv-presets-label">Quick examples:</span>
+            {PRESET_LOCATIONS.map((p, i) => (
               <button
                 key={p.label}
                 type="button"
                 className="cv-preset-btn"
-                onClick={() => {
-                  setLat(String(p.lat));
-                  setLon(String(p.lon));
-                }}
+                data-testid={`cv-preset-${i}`}
+                onClick={() => setLocation(p.lat, p.lon, p.label)}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <div className="cv-row">
-            <input aria-label="latitude" value={lat} onChange={(e) => setLat(e.target.value)} />
-            <input aria-label="longitude" value={lon} onChange={(e) => setLon(e.target.value)} />
-          </div>
 
+          <button
+            type="button"
+            className="cv-advanced-toggle"
+            onClick={() => setShowAdvanced((s) => !s)}
+          >
+            {showAdvanced ? '▾ Hide coordinates' : '▸ Enter coordinates manually'}
+          </button>
+          {showAdvanced && (
+            <div className="cv-row">
+              <input
+                aria-label="latitude"
+                placeholder="latitude"
+                value={lat ?? ''}
+                onChange={(e) => setLat(numOrUndef(e.target.value) ?? null)}
+              />
+              <input
+                aria-label="longitude"
+                placeholder="longitude"
+                value={lon ?? ''}
+                onChange={(e) => setLon(numOrUndef(e.target.value) ?? null)}
+              />
+            </div>
+          )}
+
+          <h3 className="cv-section-head">Your roof</h3>
           <label className="cv-label">Roof area (m²)</label>
           <input
             data-testid="cv-area"
             value={areaM2}
-            onChange={(e) => setAreaM2(e.target.value)}
+            onChange={(e) => {
+              setAreaM2(e.target.value);
+              setAreaFromDraw(false);
+            }}
           />
+          {!drawingRoof ? (
+            <button
+              type="button"
+              className="cv-draw-roof-btn"
+              data-testid="cv-draw-roof-btn"
+              onClick={() => setDrawingRoof(true)}
+            >
+              ✏ Draw roof on map
+            </button>
+          ) : (
+            <div className="cv-draw-actions">
+              <span className="cv-draw-hint" data-testid="cv-roof-hint">
+                Click the roof corners on the map, then Finish.
+              </span>
+              <button
+                type="button"
+                className="cv-draw-roof-btn cv-btn-primary"
+                data-testid="cv-finish-roof-btn"
+                onClick={() => mapRef.current?.finishRoof()}
+              >
+                Finish roof
+              </button>
+              <button type="button" className="cv-draw-roof-btn" onClick={() => setDrawingRoof(false)}>
+                Cancel
+              </button>
+            </div>
+          )}
+          {areaFromDraw && (
+            <div className="cv-area-note" data-testid="cv-area-from-draw">
+              Area measured from your drawn roof polygon.
+            </div>
+          )}
+
           <div className="cv-row">
             <div>
               <label className="cv-label">Usable fraction</label>
@@ -164,7 +271,7 @@ export function ConsumerView() {
         {/* ---- Outputs ---- */}
         <section className="consumer-card" data-testid="consumer-output">
           <h3>Technical breakdown</h3>
-          {!result && <p className="cv-hint">Enter your details and press Estimate.</p>}
+          {!result && <p className="cv-hint">Set your location and roof, then press Estimate.</p>}
           {result && (
             <>
               <div className="cv-metrics">

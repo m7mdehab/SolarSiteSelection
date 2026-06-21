@@ -169,3 +169,30 @@ export interface RooftopResult {
   payback_band: { low: number; base: number; high: number; basis: string } | null;
   unverified_panel: string[];
 }
+
+// ---- Geocoding (consumer location search) ----------------------------------
+
+export interface GeocodeResult {
+  label: string;
+  name: string;
+  lat: number;
+  lon: number;
+  type: string;
+}
+
+export interface GeocodeResponse {
+  query: string;
+  results: GeocodeResult[];
+  attribution: string;
+  note?: string;
+}
+
+// ---- Deploy traceability ---------------------------------------------------
+
+export interface VersionInfo {
+  git_sha: string;
+  git_describe: string | null;
+  deployed_at: string | null;
+  source: string;
+  repo: string;
+}

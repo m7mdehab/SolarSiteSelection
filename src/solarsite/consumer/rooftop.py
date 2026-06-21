@@ -1,9 +1,9 @@
 """Consumer rooftop-PV engine (Track B).
 
 Pure, deterministic functions. The energy side is fully computed; the economic
-side returns ``None`` for any output whose required input is an unverified
-``NEEDS_HUMAN_DECISION`` stub (never a fabricated number). Every output is run
-through the physical-sanity gate before it leaves this module.
+side returns ``None`` for any output whose required input was not provided by the
+user (never a fabricated number). Every output is run through the physical-sanity
+gate before it leaves this module.
 """
 
 from __future__ import annotations
@@ -52,8 +52,8 @@ def energy_balance(
 ) -> EnergyBalance:
     """Split annual production into self-consumed / exported / grid-import.
 
-    Two dispatch policies (the LOGIC is autonomous; which policy a jurisdiction
-    allows is a NEEDS_HUMAN_DECISION surfaced to the user):
+    Two dispatch policies (the LOGIC is fixed; which policy a jurisdiction
+    allows is a user input surfaced in the UI):
 
     * ``self_consumption_fraction`` given → instantaneous self-consumption: a
       fixed fraction of production is used on-site (capped at consumption).
@@ -203,7 +203,7 @@ def analyze_rooftop(
     ]
     if economics.unverified_inputs:
         ledger.append(
-            "UNVERIFIED economic inputs (NEEDS_HUMAN_DECISION): "
+            "Economic inputs still needed for cost results (enter your own): "
             + ", ".join(economics.unverified_inputs)
         )
 
